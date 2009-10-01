@@ -1,6 +1,5 @@
 %define checkout 20090406
 %define major           0
-%define lib             %mklibname %{name}
 %define libname         %mklibname %{name} %{major}
 %define develname       %mklibname %{name} -d
 
@@ -36,11 +35,11 @@ Group: System/Libraries
 An interface library for time-related personal information management related
 data.
 
-%package -n %{lib}-doc
+%package doc
 Summary: Jana development documentation
 Group: System/Libraries
 
-%description -n %{lib}-doc
+%description doc
 Documentation for the Jana libraries
 
 %package -n %{libname}-gtk
@@ -93,17 +92,17 @@ rm -rf %{buildroot}
 
 %files -n %{libname}
 %defattr(-,root,root,-)
-%{_libdir}/%{lib}.so.*
+%{_libdir}/lib%{name}.so.*
 
 %files -n %{libname}-gtk
 %defattr(-,root,root,-)
-%{_libdir}/%{lib}-gtk.so.*
+%{_libdir}/lib%{name}-gtk.so.*
 
 %files -n %{libname}-ecal
 %defattr(-,root,root,-)
-%{_libdir}/%{lib}-ecal.so.*
+%{_libdir}/lib%{name}-ecal.so.*
 
-%files -n %{lib}-doc
+%files doc
 %defattr(-,root,root,-)
 %doc COPYING AUTHORS ChangeLog MAINTAINERS README
 %{_datadir}/doc
@@ -112,10 +111,9 @@ rm -rf %{buildroot}
 %files -n %{develname}
 %defattr(-,root,root,-)
 %{_includedir}/*
-%{_libdir}/%{lib}.so
-%{_libdir}/%{lib}-*.so
-%{_libdir}/pkgconfig/%{lib}*.pc
-%{_libdir}/%{lib}*.a
-%{_libdir}/%{lib}*.la
+%{_libdir}/*.so
+%{_libdir}/pkgconfig/*.pc
+%{_libdir}/*.a
+%{_libdir}/*.la
 %{_datadir}/jana/landwater.vmf
 %{_datadir}/glade3/catalogs/*
