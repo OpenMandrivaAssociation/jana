@@ -17,7 +17,6 @@ BuildRequires: intltool
 BuildRequires: gtk2-devel
 BuildRequires: gnome-common
 BuildRequires: gtk-doc
-BuildRequires: libecal7
 BuildRequires: libdbus-1-devel
 BuildRequires: libgladeui-devel
 BuildRequires: libedataserver-devel
