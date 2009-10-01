@@ -72,7 +72,7 @@ Header files and libraries for building applications with Jana
 %setup -q -n %{name}-git%{checkout}
 
 %build
-./autogen.sh
+NOCONFIGURE=cassoulet ./autogen.sh
 %configure2_5x --enable-gtk-doc --enable-glade
 %make
 
