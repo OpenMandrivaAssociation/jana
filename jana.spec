@@ -1,4 +1,10 @@
-%define checkout 20090406
+%define version 0.0.0
+%define rel 3
+%define snapshot git20090406
+%define release %mkrel 0.%{snapshot}.%{rel}
+
+%define sversion %{version}%{snapshot}
+
 %define major           0
 %define libname         %mklibname %{name} %{major}
 %define develname       %mklibname %{name} -d
@@ -6,11 +12,11 @@
 Name: jana
 Summary: An interface library for time-related PIM
 Group: System/Libraries
-Version: 0.0.0git%{checkout}
+Version: %{version}
 License: GPLv2
 URL: http://git.gnome.org/cgit/jana
-Release: %mkrel 2
-Source0: %{name}-git%{checkout}.tar.gz
+Release: %{release}
+Source0: %{name}-%{snapshot}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 
 BuildRequires: intltool
@@ -68,7 +74,7 @@ Requires: %{libname} >= %{version}
 Header files and libraries for building applications with Jana
 
 %prep
-%setup -q -n %{name}-git%{checkout}
+%setup -q -n %{name}-%{snapshot}
 
 %build
 NOCONFIGURE=cassoulet ./autogen.sh
