@@ -9,7 +9,7 @@ Group: System/Libraries
 Version: 0.0.0git%{checkout}
 License: GPLv2
 URL: http://git.gnome.org/cgit/jana
-Release: %mkrel 1
+Release: %mkrel 2
 Source0: %{name}-git%{checkout}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 
@@ -58,7 +58,7 @@ Jana's ECAL support
 
 %package -n %{develname}
 Summary: Jana development environment
-Group: System/Libraries
+Group: Development/C
 
 Requires: %{libname} = %{version}-%{release}
 Requires: pkgconfig
