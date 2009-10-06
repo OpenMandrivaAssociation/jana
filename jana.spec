@@ -1,5 +1,5 @@
 %define version 0.0.0
-%define rel 4
+%define rel 5
 %define snapshot git20090406
 %define release %mkrel 0.%{snapshot}.%{rel}
 
@@ -67,6 +67,8 @@ Summary: Jana development environment
 Group: Development/C
 
 Requires: %{libname} = %{version}-%{release}
+Requires: %{libname}-gtk = %{version}-%{release}
+Requires: %{libname}-ecal = %{version}-%{release}
 Provides: %{name}-devel
 
 %description -n %{develname}
