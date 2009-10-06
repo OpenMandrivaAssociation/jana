@@ -1,5 +1,5 @@
 %define version 0.0.0
-%define rel 3
+%define rel 4
 %define snapshot git20090406
 %define release %mkrel 0.%{snapshot}.%{rel}
 
@@ -69,6 +69,7 @@ Group: Development/C
 Requires: %{libname} = %{version}-%{release}
 Requires: pkgconfig
 Requires: %{libname} >= %{version}
+Provides: %{name}-devel
 
 %description -n %{develname}
 Header files and libraries for building applications with Jana
