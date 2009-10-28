@@ -1,5 +1,5 @@
 %define version 0.0.0
-%define rel 5
+%define rel 6
 %define snapshot git20090406
 %define release %mkrel 0.%{snapshot}.%{rel}
 
@@ -17,6 +17,8 @@ License: GPLv2
 URL: http://git.gnome.org/cgit/jana
 Release: %{release}
 Source0: %{name}-%{snapshot}.tar.gz
+Patch0: jana-20091028-fix-jana-task-get-priority.patch
+Patch1: jana-20091028-add-po-to-subdirs.patch
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 
 BuildRequires: intltool
@@ -76,6 +78,8 @@ Header files and libraries for building applications with Jana
 
 %prep
 %setup -q -n %{name}-%{snapshot}
+%patch0 -p1
+%patch1 -p1
 
 %build
 NOCONFIGURE=cassoulet ./autogen.sh
