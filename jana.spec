@@ -1,6 +1,6 @@
-%define version 0.0.0
-%define rel 8
-%define snapshot git20090406
+%define version 0.4.5
+%define rel 1
+%define snapshot 20100520
 %define release %mkrel 0.%{snapshot}.%{rel}
 
 %define sversion %{version}%{snapshot}
@@ -16,11 +16,7 @@ Version: %{version}
 License: GPLv2
 URL: http://git.gnome.org/cgit/jana
 Release: %{release}
-Source0: %{name}-%{snapshot}.tar.gz
-Patch0: jana-20091028-fix-jana-task-get-priority.patch
-Patch1: jana-20091028-add-po-to-subdirs.patch
-BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
-
+Source0: %{name}-%{version}-%{snapshot}.tar.bz2
 BuildRequires: intltool
 BuildRequires: gtk2-devel
 BuildRequires: gnome-common
@@ -29,6 +25,7 @@ BuildRequires: libdbus-1-devel
 BuildRequires: libgladeui-devel
 BuildRequires: libedataserver-devel
 BuildRequires: evolution-data-server-devel
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 
 %description
 An interface library for time-related personal information management related
@@ -77,9 +74,7 @@ Provides: %{name}-devel
 Header files and libraries for building applications with Jana
 
 %prep
-%setup -q -n %{name}-%{snapshot}
-%patch0 -p1
-%patch1 -p1
+%setup -q -n %{name}-%{version}
 
 %build
 NOCONFIGURE=cassoulet ./autogen.sh
