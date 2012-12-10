@@ -1,0 +1,1720 @@
+diff --git a/configure.ac b/configure.ac
+index 5a984f9..9814c84 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -21,9 +21,9 @@ AC_CHECK_LIB(m, pow)
+ 
+ PKG_CHECK_MODULES(GOBJECT, gobject-2.0 >= 2.12.0)
+ PKG_CHECK_MODULES(GTHREAD, gthread-2.0)
+-PKG_CHECK_MODULES(GTK, gtk+-2.0 >= 2.6.0)
++PKG_CHECK_MODULES(GTK, gtk+-3.0 >= 2.99.1)
+ PKG_CHECK_MODULES(ECAL, libecal-1.2 >= 1.4.0)
+-PKG_CHECK_MODULES(EDATASERVERUI, libedataserverui-1.2)
++PKG_CHECK_MODULES(EDATASERVERUI, libedataserverui-3.0)
+ 
+ PKG_CHECK_MODULES(GCONF, gconf-2.0)
+ 
+@@ -59,8 +59,8 @@ AC_ARG_ENABLE([glade],
+ if test "$enable_glade" = yes; then
+ 	PKG_PROG_PKG_CONFIG()
+ 	AC_DEFINE(HAVE_GLADE, 1, [Defined when building with glade-3 support])
+-	PKG_CHECK_MODULES(GLADE, gladeui-1.0 >= 3.4.5)
+-	catalogdir=`${PKG_CONFIG} --variable=catalogdir gladeui-1.0`
++	PKG_CHECK_MODULES(GLADE, gladeui-2.0 >= 3.4.5)
++	catalogdir=`${PKG_CONFIG} --variable=catalogdir gladeui-2.0`
+ fi
+ 
+ AM_CONDITIONAL(WITH_GLADE, test "$enable_glade" = yes)
+diff --git a/libjana-gtk/jana-gtk-cell-renderer-event.c b/libjana-gtk/jana-gtk-cell-renderer-event.c
+index 194d1ef..13bcefe 100644
+--- a/libjana-gtk/jana-gtk-cell-renderer-event.c
++++ b/libjana-gtk/jana-gtk-cell-renderer-event.c
+@@ -83,14 +83,14 @@ enum {
+ };
+ 
+ static void
+-cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+-			    GtkWidget *widget, GdkRectangle *background_area,
+-			    GdkRectangle *cell_area, GdkRectangle *expose_area,
++cell_renderer_event_render (GtkCellRenderer *cell, cairo_t *cr,
++			    GtkWidget *widget, const GdkRectangle *background_area,
++			    const GdkRectangle *cell_area,
+ 			    GtkCellRendererState flags);
+ 
+ static void
+ cell_renderer_event_get_size (GtkCellRenderer *cell, GtkWidget *widget,
+-			      GdkRectangle *cell_area, gint *x_offset,
++			      const GdkRectangle *cell_area, gint *x_offset,
+ 			      gint *y_offset, gint *width, gint *height);
+ 
+ static void
+@@ -665,7 +665,7 @@ get_description_layout (JanaGtkCellRendererEvent *cell, GtkWidget *widget,
+ 	/* Make Pango attribute list for small text */
+ 	attrs = pango_attr_list_new ();
+ 	size = pango_attr_size_new (pango_font_description_get_size (
+-		widget->style->font_desc) * PANGO_SCALE_SMALL);
++		gtk_widget_get_style (widget)->font_desc) * PANGO_SCALE_SMALL);
+ 	size->start_index = 0;
+ 	size->end_index = G_MAXUINT;
+ 	pango_attr_list_change (attrs, size);
+@@ -801,9 +801,9 @@ get_description_layout (JanaGtkCellRendererEvent *cell, GtkWidget *widget,
+ }
+ 
+ static void
+-cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+-			    GtkWidget *widget, GdkRectangle *background_area,
+-			    GdkRectangle *cell_area, GdkRectangle *expose_area,
++cell_renderer_event_render (GtkCellRenderer *cell, cairo_t *cr,
++			    GtkWidget *widget, const GdkRectangle *background_area,
++			    const GdkRectangle *cell_area,
+ 			    GtkCellRendererState flags)
+ {
+ 	GtkStateType state;
+@@ -837,14 +837,14 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 	
+ 	if ((!priv->draw_box) || (!priv->category_color_hash) ||
+ 	    (!priv->categories) || (!priv->categories[0])) {
+-		style = widget->style;
++		style = gtk_widget_get_style (widget);
+ 	} else {
+ 		GdkColor *color;
+ 		
+ 		color = g_hash_table_lookup (
+ 			priv->category_color_hash, priv->categories[0]);
+ 		
+-		style = gtk_style_copy (widget->style);
++		style = gtk_style_copy (gtk_widget_get_style (widget));
+ 		if (color) {
+ 			gint intensity, avg;
+ 			style->bg[state] = *color;
+@@ -904,15 +904,15 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 				}
+ 			}
+ 		}
+-		style = gtk_style_attach (style, widget->window);
++		style = gtk_style_attach (style, gtk_widget_get_window (widget));
+ 	}
+ 	
+ 	/* Draw event box */
+ 	if (priv->draw_box) {
+-		gtk_paint_box (style, window, state,
++		gtk_paint_box (style, cr, state,
+ 			(state == GTK_STATE_ACTIVE) ?
+ 			       GTK_SHADOW_IN : GTK_SHADOW_OUT,
+-			expose_area, widget, priv->style_hint, x, y, w, h);
++			widget, priv->style_hint, x, y, w, h);
+ 	}
+ 	
+ 	/* Draw event text */
+@@ -924,9 +924,9 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 		if ((text_clip.height > 0) && (text_clip.width > 0) &&
+ 		    (layout = get_summary_layout (
+ 		    JANA_GTK_CELL_RENDERER_EVENT (cell), widget, &text_clip))) {
+-			gtk_paint_layout (style, window, state,
++			gtk_paint_layout (style, cr, state,
+ 				!priv->draw_box,
+-				&text_clip, widget, priv->style_hint,
++				widget, priv->style_hint,
+ 				text_clip.x, text_clip.y,
+ 				layout);
+ 
+@@ -939,9 +939,9 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 		if ((text_clip.height > 0) && (text_clip.width > 0) &&
+ 		    (priv->draw_detail) && (layout = get_description_layout (
+ 		    JANA_GTK_CELL_RENDERER_EVENT (cell), widget, &text_clip))) {
+-			gtk_paint_layout (style, window, state,
++			gtk_paint_layout (style, cr, state,
+ 				!priv->draw_box,
+-				&text_clip, widget, priv->style_hint,
++				widget, priv->style_hint,
+ 				text_clip.x, text_clip.y,
+ 				layout);
+ 
+@@ -960,8 +960,8 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 		
+ 		if ((w + xpad + (priv->xpadi/2) <= cell_area->width) &&
+ 		    (h + ypad + (priv->ypadi/2) <= cell_area->height))
+-			gtk_paint_resize_grip (style, window, state,
+-				expose_area, widget, priv->style_hint,
++			gtk_paint_resize_grip (style, cr, state,
++				widget, priv->style_hint,
+ 				GDK_WINDOW_EDGE_SOUTH_EAST, x, y, w, h);
+ 	}
+ 	
+@@ -973,7 +973,7 @@ cell_renderer_event_render (GtkCellRenderer *cell, GdkWindow *window,
+ 
+ static void
+ cell_renderer_event_get_size (GtkCellRenderer *cell, GtkWidget *widget,
+-			      GdkRectangle *cell_area, gint *x_offset,
++			      const GdkRectangle *cell_area, gint *x_offset,
+ 			      gint *y_offset, gint *width, gint *height)
+ {
+ 	JanaGtkCellRendererEventPrivate *priv =
+diff --git a/libjana-gtk/jana-gtk-cell-renderer-note.c b/libjana-gtk/jana-gtk-cell-renderer-note.c
+index 9aacd9b..c7a58b4 100644
+--- a/libjana-gtk/jana-gtk-cell-renderer-note.c
++++ b/libjana-gtk/jana-gtk-cell-renderer-note.c
+@@ -82,14 +82,14 @@ enum {
+ };
+ 
+ static void
+-cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+-			   GtkWidget *widget, GdkRectangle *background_area,
+-			   GdkRectangle *cell_area, GdkRectangle *expose_area,
++cell_renderer_note_render (GtkCellRenderer *cell, cairo_t *cr,
++			   GtkWidget *widget, const GdkRectangle *background_area,
++			   const GdkRectangle *cell_area,
+ 			   GtkCellRendererState flags);
+ 
+ static void
+ cell_renderer_note_get_size (GtkCellRenderer *cell, GtkWidget *widget,
+-			     GdkRectangle *cell_area, gint *x_offset,
++			     const GdkRectangle *cell_area, gint *x_offset,
+ 			     gint *y_offset, gint *width, gint *height);
+ 
+ static void
+@@ -755,9 +755,20 @@ get_body_layout (JanaGtkCellRendererNote *cell, GtkWidget *widget,
+ }
+ 
+ static void
+-cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+-			   GtkWidget *widget, GdkRectangle *background_area,
+-			   GdkRectangle *cell_area, GdkRectangle *expose_area,
++draw_pixbuf (cairo_t *cr, GdkPixbuf *pixbuf, gint offset_x, gint offset_y)
++{
++	cairo_save (cr);
++	cairo_translate (cr, offset_x, offset_y);
++
++	gdk_cairo_set_source_pixbuf (cr, pixbuf, 0, 0);
++	cairo_paint (cr);
++	cairo_restore (cr);
++}
++
++static void
++cell_renderer_note_render (GtkCellRenderer *cell, cairo_t *cr,
++			   GtkWidget *widget, const GdkRectangle *background_area,
++			   const GdkRectangle *cell_area,
+ 			   GtkCellRendererState flags)
+ {
+ 	GtkStateType state;
+@@ -789,14 +800,14 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 	
+ 	if ((!priv->draw_box) || (!priv->category_color_hash) ||
+ 	    (!priv->categories) || (!priv->categories[0])) {
+-		style = widget->style;
++		style = gtk_widget_get_style (widget);
+ 	} else {
+ 		GdkColor *color;
+ 		
+ 		color = g_hash_table_lookup (
+ 			priv->category_color_hash, priv->categories[0]);
+ 		
+-		style = gtk_style_copy (widget->style);
++		style = gtk_style_copy (gtk_widget_get_style (widget));
+ 		if (color) {
+ 			gint intensity, avg;
+ 			style->bg[state] = *color;
+@@ -856,15 +867,15 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 				}
+ 			}
+ 		}
+-		style = gtk_style_attach (style, widget->window);
++		style = gtk_style_attach (style, gtk_widget_get_window (widget));
+ 	}
+ 	
+ 	/* Draw box */
+ 	if (priv->draw_box) {
+-		gtk_paint_box (style, window, state,
++		gtk_paint_box (style, cr, state,
+ 			(state == GTK_STATE_ACTIVE) ?
+ 			       GTK_SHADOW_IN : GTK_SHADOW_OUT,
+-			expose_area, widget, priv->style_hint, x, y, w, h);
++			widget, priv->style_hint, x, y, w, h);
+ 	}
+ 	
+ 	/* Calculate text size text */
+@@ -880,20 +891,18 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 		 */
+ 		switch (priv->justify) {
+ 		    case GTK_JUSTIFY_RIGHT :
+-			gdk_draw_pixbuf (window, style->black_gc, priv->icon,
+-				0, 0, (text_clip.x + text_clip.width) -
++			draw_pixbuf (cr, priv->icon,
++				(text_clip.x + text_clip.width) -
+ 					 gdk_pixbuf_get_width (priv->icon),
+-				text_clip.y, -1, -1, GDK_RGB_DITHER_NORMAL,
+-				0, 0);
++				text_clip.y);
+ 			text_clip.width -= gdk_pixbuf_get_width (priv->icon) +
+ 				priv->xpadi;
+ 			break;
+ 		    case GTK_JUSTIFY_CENTER :
+-			gdk_draw_pixbuf (window, style->black_gc, priv->icon,
+-				0, 0, text_clip.x + (text_clip.width/2) -
++			draw_pixbuf (cr, priv->icon,
++				text_clip.x + (text_clip.width/2) -
+ 					(gdk_pixbuf_get_width (priv->icon)/2),
+-				text_clip.y, -1, -1, GDK_RGB_DITHER_NORMAL,
+-				0, 0);
++				text_clip.y);
+ 			text_clip.y += gdk_pixbuf_get_height (priv->icon) +
+ 				priv->ypadi;
+ 			text_clip.height -= gdk_pixbuf_get_height (priv->icon) +
+@@ -902,9 +911,8 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 		    case GTK_JUSTIFY_FILL :
+ 		    case GTK_JUSTIFY_LEFT :
+ 		    default :
+-			gdk_draw_pixbuf (window, style->black_gc, priv->icon,
+-				0, 0, text_clip.x, text_clip.y, -1, -1,
+-				GDK_RGB_DITHER_NORMAL, 0, 0);
++			draw_pixbuf (cr, priv->icon,
++				text_clip.x, text_clip.y);
+ 			text_clip.x += gdk_pixbuf_get_width (priv->icon) +
+ 				priv->xpadi;
+ 			text_clip.width -= gdk_pixbuf_get_width (priv->icon) +
+@@ -917,9 +925,9 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 	if ((text_clip.height > 0) && (text_clip.width > 0) &&
+ 	    (layout = get_header_layout (
+ 	    JANA_GTK_CELL_RENDERER_NOTE (cell), widget, &text_clip))) {
+-		gtk_paint_layout (style, window, state,
++		gtk_paint_layout (style, cr, state,
+ 			!priv->draw_box,
+-			&text_clip, widget, priv->style_hint,
++			widget, priv->style_hint,
+ 			text_clip.x, text_clip.y,
+ 			layout);
+ 
+@@ -933,9 +941,9 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 	if ((text_clip.height > 0) && (text_clip.width > 0) &&
+ 	    (layout = get_body_layout (JANA_GTK_CELL_RENDERER_NOTE (cell),
+ 				       widget, &text_clip))) {
+-		gtk_paint_layout (style, window, state,
++		gtk_paint_layout (style, cr, state,
+ 			!priv->draw_box,
+-			&text_clip, widget, priv->style_hint,
++			widget, priv->style_hint,
+ 			text_clip.x, text_clip.y,
+ 			layout);
+ 
+@@ -979,13 +987,8 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 				}
+ 			}
+ 			
+-			gdk_draw_pixbuf (window, style->black_gc,
+-				pixbuf, 0, 0, x, y,
+-				MIN (text_clip.width - w, w),
+-				MIN (text_clip.height - h, h),
+-				GDK_RGB_DITHER_NORMAL,
+-				0, 0);
+-			
++			draw_pixbuf (cr, pixbuf, x, y);
++
+ 			cumu_width += w;
+ 		}
+ 	}
+@@ -999,7 +1002,7 @@ cell_renderer_note_render (GtkCellRenderer *cell, GdkWindow *window,
+ 
+ static void
+ cell_renderer_note_get_size (GtkCellRenderer *cell, GtkWidget *widget,
+-			     GdkRectangle *cell_area, gint *x_offset,
++			     const GdkRectangle *cell_area, gint *x_offset,
+ 			     gint *y_offset, gint *width, gint *height)
+ {
+ 	gint text_width, text_height, icon_width, icon_height;
+diff --git a/libjana-gtk/jana-gtk-clock.c b/libjana-gtk/jana-gtk-clock.c
+index 052b2c3..1635404 100644
+--- a/libjana-gtk/jana-gtk-clock.c
++++ b/libjana-gtk/jana-gtk-clock.c
+@@ -840,15 +840,19 @@ draw_digital_clock (JanaGtkClock *clock, cairo_t *cr, GtkStyle *style)
+ }
+ 
+ static gboolean
+-jana_gtk_clock_expose_event (GtkWidget *widget, GdkEventExpose *event)
++jana_gtk_clock_draw (GtkWidget *widget, cairo_t *cr)
+ {
+ 	JanaGtkClockPrivate *priv = CLOCK_PRIVATE (widget);
+ 	
+ 	/* Don't draw anything until the entire clock is ready to draw */
+ 	if (!priv->draw_thread) {
+-		cairo_t *cr = gdk_cairo_create (widget->window);
+-		cairo_translate (cr, widget->allocation.x,
+-			widget->allocation.y);
++		GtkAllocation allocation = { 0 };
++
++		gtk_widget_get_allocation (widget, &allocation);
++
++		cairo_save (cr);
++		cairo_translate (cr, allocation.x,
++			allocation.y);
+ 
+ 		/* Draw background */
+ 		if (priv->buffer) {
+@@ -860,17 +864,17 @@ jana_gtk_clock_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 		if (!priv->buffer_time) {
+ 			if (priv->digital)
+ 				draw_digital_face ((JanaGtkClock *)widget, cr,
+-					widget->style, priv->time);
++					gtk_widget_get_style (widget), priv->time);
+ 			else
+ 				draw_analogue_face ((JanaGtkClock *)widget, cr,
+-					widget->style, priv->time);
++					gtk_widget_get_style (widget), priv->time);
+ 		}
+-		
+-		cairo_destroy (cr);
++
++		cairo_restore (cr);
+ 	}
+ 	
+ 	return GTK_WIDGET_CLASS (jana_gtk_clock_parent_class)->
+-		expose_event (widget, event);
++		draw (widget, cr);
+ }
+ 
+ static gboolean
+@@ -891,17 +895,20 @@ draw_clock (JanaGtkClock *self)
+ {
+ 	JanaGtkClockPrivate *priv = CLOCK_PRIVATE (self);
+ 	cairo_t *cr = cairo_create (priv->buffer);
+-	
++	GtkStyle *style;
++
++	style = gtk_widget_get_style (GTK_WIDGET (self));
++
+ 	if (priv->digital) {
+-		draw_digital_clock (self, cr, GTK_WIDGET (self)->style);
++		draw_digital_clock (self, cr, style);
+ 		if (priv->buffer_time && (!priv->dirty))
+ 			draw_digital_face (self, cr,
+-				GTK_WIDGET (self)->style, priv->time_copy);
++				style, priv->time_copy);
+ 	} else {
+-		draw_analogue_clock (self, cr, GTK_WIDGET (self)->style);
++		draw_analogue_clock (self, cr, style);
+ 		if (priv->buffer_time && (!priv->dirty))
+ 			draw_analogue_face (self, cr,
+-				GTK_WIDGET (self)->style, priv->time_copy);
++				style, priv->time_copy);
+ 	}
+ 
+ 	cairo_destroy (cr);
+@@ -919,10 +926,10 @@ refresh_buffer (JanaGtkClock *self)
+ {
+ 	JanaGtkClockPrivate *priv = CLOCK_PRIVATE (self);
+ 	
+-	if ((!GTK_WIDGET_MAPPED (self)) || (!priv->buffer)) return;
++	if ((!gtk_widget_get_mapped (GTK_WIDGET (self))) || (!priv->buffer)) return;
+ 	
+ 	stop_draw_thread (self);
+-	priv->style = gtk_style_copy (GTK_WIDGET (self)->style);
++	priv->style = gtk_style_copy (gtk_widget_get_style (GTK_WIDGET (self)));
+ 	priv->time_copy = priv->time ? jana_time_duplicate (priv->time) : NULL;
+ 	g_signal_emit (self, signals[RENDER_START], 0);
+ 	priv->draw_thread = g_thread_create ((GThreadFunc)draw_clock,
+@@ -938,7 +945,7 @@ jana_gtk_clock_size_allocate (GtkWidget *widget, GtkAllocation *allocation)
+ 	GTK_WIDGET_CLASS (jana_gtk_clock_parent_class)->
+ 		size_allocate (widget, allocation);
+ 
+-	if (!GTK_WIDGET_REALIZED (widget)) gtk_widget_realize (widget);
++	if (!gtk_widget_get_realized (widget)) gtk_widget_realize (widget);
+ 
+ 	if ((!priv->buffer) || (allocation->width !=
+ 	     cairo_image_surface_get_width (priv->buffer)) ||
+@@ -957,7 +964,7 @@ static void
+ jana_gtk_clock_map (GtkWidget *widget)
+ {
+ 	GTK_WIDGET_CLASS (jana_gtk_clock_parent_class)->map (widget);
+-	GTK_WIDGET_SET_FLAGS (widget, GTK_MAPPED);
++	gtk_widget_set_mapped (widget, TRUE);
+ 	refresh_buffer (JANA_GTK_CLOCK (widget));
+ }
+ 
+@@ -966,7 +973,7 @@ jana_gtk_clock_unmap (GtkWidget *widget)
+ {
+ 	GTK_WIDGET_CLASS (jana_gtk_clock_parent_class)->unmap (widget);
+ 
+-	GTK_WIDGET_UNSET_FLAGS (widget, GTK_MAPPED);
++	gtk_widget_set_mapped (widget, FALSE);
+ }
+ 
+ static void
+@@ -1033,7 +1040,7 @@ jana_gtk_clock_class_init (JanaGtkClockClass *klass)
+ 	object_class->dispose = jana_gtk_clock_dispose;
+ 	object_class->finalize = jana_gtk_clock_finalize;
+ 	
+-	widget_class->expose_event = jana_gtk_clock_expose_event;
++	widget_class->draw = jana_gtk_clock_draw;
+ 	widget_class->size_allocate = jana_gtk_clock_size_allocate;
+ 	widget_class->style_set = jana_gtk_clock_style_set;
+ 	widget_class->map = jana_gtk_clock_map;
+@@ -1250,9 +1257,8 @@ jana_gtk_clock_get_draw_shadow (JanaGtkClock *self)
+ static void
+ placeholder_realize_cb (GtkWidget *widget)
+ {
+-	GTK_WIDGET_SET_FLAGS (widget, GTK_NO_WINDOW);
+-	if (widget->window) g_object_unref (widget->window);
+-	widget->window = g_object_ref (gtk_widget_get_parent (widget)->window);
++	gtk_widget_set_has_window (widget, FALSE);
++	gtk_widget_set_window (widget, gtk_widget_get_window (gtk_widget_get_parent (widget)));
+ 	gtk_widget_queue_draw (gtk_widget_get_parent (widget));
+ }
+ 
+@@ -1266,7 +1272,7 @@ jana_gtk_clock_glade_add_cb (GtkContainer *container,
+ 	g_signal_connect_after (widget, "realize",
+ 		G_CALLBACK (placeholder_realize_cb), NULL);
+ 
+-	if (GTK_WIDGET_REALIZED (widget))
++	if (gtk_widget_get_realized (widget))
+ 		placeholder_realize_cb (widget);
+ }
+ 
+diff --git a/libjana-gtk/jana-gtk-day-view.c b/libjana-gtk/jana-gtk-day-view.c
+index b3e6035..68154c2 100644
+--- a/libjana-gtk/jana-gtk-day-view.c
++++ b/libjana-gtk/jana-gtk-day-view.c
+@@ -449,38 +449,41 @@ jana_gtk_day_view_finalize (GObject *object)
+ }
+ 
+ static void
+-paint_box (GtkStyle *style, GdkWindow *window, GtkStateType state_type,
+-	   GtkShadowType shadow_type, GdkRectangle *area, GtkWidget *widget,
++paint_box (GtkStyle *style, cairo_t *cr, GtkStateType state_type,
++	   GtkShadowType shadow_type, GtkWidget *widget,
+ 	   const gchar *detail, gint x, gint y, gint width, gint height)
+ {
+-	gtk_paint_flat_box (style, window, state_type, shadow_type, area,
++	gtk_paint_flat_box (style, cr, state_type, shadow_type,
+ 		widget, detail, x, y, width, height);
+-	gtk_paint_shadow (style, window, state_type, shadow_type, area,
++	gtk_paint_shadow (style, cr, state_type, shadow_type,
+ 		widget, detail, x, y, width, height);
+ }
+ 
+ static gboolean
+-layout_expose_event_cb (GtkWidget *widget, GdkEventExpose *event,
++layout_draw_cb (GtkWidget *widget, cairo_t *cr,
+ 			JanaGtkDayView *self)
+ {
+ 	gint x, y, box_x, box_y, row_height, col_width, selection_direction;
+ 	GtkStyle *style;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+ 	
+ 	if ((!jana_duration_valid (priv->range)) || (priv->cells == 0))
+ 		return FALSE;
+-	
++
++	gtk_widget_get_allocation (widget, &allocation);
++
+ 	/* Draw background */
+ 	/* Make a style with base as bg */
+-	style = gtk_style_copy (widget->style);
++	style = gtk_style_copy (gtk_widget_get_style (widget));
+ 	style->bg[GTK_STATE_NORMAL] = style->base[GTK_STATE_NORMAL];
+ 	style->bg[GTK_STATE_SELECTED] = style->base[GTK_STATE_SELECTED];
+-	style = gtk_style_attach (style, widget->window);
++	style = gtk_style_attach (style, gtk_widget_get_window (widget));
+ 
+ 	/* Draw event boxes */
+-	row_height = widget->allocation.height / priv->cells;
+-	col_width = widget->allocation.width / priv->visible_days;
++	row_height = allocation.height / priv->cells;
++	col_width = allocation.width / priv->visible_days;
+ 	
+ 	if ((priv->selection_start_x < priv->selection_end_x) ||
+ 	    ((priv->selection_start_x == priv->selection_end_x) &&
+@@ -538,18 +541,18 @@ layout_expose_event_cb (GtkWidget *widget, GdkEventExpose *event,
+ 					state = GTK_STATE_SELECTED;
+ 			}
+ 
+-			paint_box (style, widget->window,
++			paint_box (style, cr,
+ 				state, GTK_SHADOW_IN,
+-				&event->area, widget, priv->style_hint,
++				widget, priv->style_hint,
+ 				box_x, box_y, col_width, row_height);
+ 			
+ 			if (priv->highlighted_time &&
+ 			    (x == priv->highlighted_time_x) &&
+ 			    (y == priv->highlighted_time_y)) {
+ 				/* Draw time line */
+-				gtk_paint_hline (style, widget->window,
++				gtk_paint_hline (style, cr,
+ 					GTK_STATE_SELECTED,
+-					&event->area, widget,
++					widget,
+ 					priv->style_hint, box_x,
+ 					box_x + col_width,
+ 					(gdouble)row_height *
+@@ -567,39 +570,43 @@ layout_expose_event_cb (GtkWidget *widget, GdkEventExpose *event,
+ }
+ 
+ static gboolean
+-layout24hr_expose_event_cb (GtkWidget *widget, GdkEventExpose *event,
++layout24hr_draw_cb (GtkWidget *widget, cairo_t *cr,
+ 			JanaGtkDayView *self)
+ {
+ 	gint x, box_x, col_width, text_width, text_height;
+ 	GtkStyle *dark_style;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+ 	
+ 	if ((!jana_duration_valid (priv->range)) || (priv->cells == 0))
+ 		return FALSE;
+-	
+-	col_width = priv->layout->allocation.width / priv->visible_days;
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++	col_width = allocation.width / priv->visible_days;
+ 
+ 	/* Draw headers */
+ 	/* Create darker style */
+-	dark_style = gtk_style_copy (widget->style);
++	dark_style = gtk_style_copy (gtk_widget_get_style (widget));
+ 	dark_style->bg[GTK_STATE_NORMAL] = dark_style->bg[GTK_STATE_ACTIVE];
+ 	dark_style->fg[GTK_STATE_NORMAL] = dark_style->fg[GTK_STATE_ACTIVE];
+-	dark_style = gtk_style_attach (dark_style, widget->window);
++	dark_style = gtk_style_attach (dark_style, gtk_widget_get_window (widget));
++
++	gtk_widget_get_allocation (priv->layout24hr, &allocation);
+ 
+ 	/* Week/day headers */
+ 	for (x = 0, box_x = 0; x < priv->visible_days; x++) {
+ 		PangoLayout *layout = priv->day_layouts[x];
+ 		pango_layout_get_pixel_size (layout, &text_width, &text_height);
+ 
+-		paint_box (dark_style, widget->window,
++		paint_box (dark_style, cr,
+ 			GTK_STATE_NORMAL, GTK_SHADOW_OUT,
+-			&event->area, widget, priv->style_hint,
++			widget, priv->style_hint,
+ 			box_x, 0,
+-			col_width, priv->layout24hr->allocation.height);
++			col_width, allocation.height);
+ 
+-		gtk_paint_layout (dark_style, widget->window,
+-			GTK_STATE_NORMAL, FALSE, &event->area,
++		gtk_paint_layout (dark_style, cr,
++			GTK_STATE_NORMAL, FALSE,
+ 			widget, priv->style_hint,
+ 			box_x + (col_width / 2) - (text_width / 2),
+ 			(priv->row0_height / 2) - (text_height / 2),
+@@ -613,49 +620,54 @@ layout24hr_expose_event_cb (GtkWidget *widget, GdkEventExpose *event,
+ }
+ 
+ static gboolean
+-jana_gtk_day_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
++jana_gtk_day_view_draw (GtkWidget *widget, cairo_t *cr)
+ {
+ 	gint y, box_y, row_height, col_width,
+ 		row_offset, text_width, text_height;
+ 	GtkAdjustment *adjustment;
+ 	GtkStyle *dark_style;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (widget);
+ 	
+ 	if ((!jana_duration_valid (priv->range)) || (priv->cells == 0))
+ 		return FALSE;
+-	
+-	row_height = priv->layout->allocation.height / priv->cells;
+-	col_width = priv->layout->allocation.width / priv->visible_days;
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
++	row_height = allocation.height / priv->cells;
++	col_width = allocation.width / priv->visible_days;
+ 
+ 	/* Draw headers */
+ 	/* Create darker style */
+-	dark_style = gtk_style_copy (widget->style);
++	dark_style = gtk_style_copy (gtk_widget_get_style (widget));
+ 	dark_style->bg[GTK_STATE_NORMAL] = dark_style->bg[GTK_STATE_ACTIVE];
+ 	dark_style->fg[GTK_STATE_NORMAL] = dark_style->fg[GTK_STATE_ACTIVE];
+-	dark_style = gtk_style_attach (dark_style, widget->window);
++	dark_style = gtk_style_attach (dark_style, gtk_widget_get_window (widget));
+ 
+ 	/* Calculate header offsets */
+ 	adjustment = gtk_viewport_get_vadjustment (
+ 		GTK_VIEWPORT (priv->viewport));
+-	row_offset = (gint)(((adjustment->value - adjustment->lower) /
+-		(adjustment->upper - adjustment->lower)) *
+-		(gdouble)priv->layout->allocation.height);
++	row_offset = (gint)(((gtk_adjustment_get_value (adjustment) - gtk_adjustment_get_lower (adjustment)) /
++		(gtk_adjustment_get_upper (adjustment) - gtk_adjustment_get_lower (adjustment))) *
++		(gdouble) allocation.height);
++
++	gtk_widget_get_allocation (priv->layout24hr, &allocation);
+ 
+ 	/* Time headers */
+-	box_y = priv->layout24hr->allocation.height - row_offset;
++	box_y = allocation.height - row_offset;
+ 	for (y = 0; y < priv->cells; y++) {
+ 		PangoLayout *layout = priv->time_layouts[y];
+ 		pango_layout_get_pixel_size (layout, &text_width, &text_height);
+ 
+-		paint_box (dark_style, widget->window,
++		paint_box (dark_style, cr,
+ 			GTK_STATE_NORMAL, GTK_SHADOW_OUT,
+-			&event->area, widget, priv->style_hint,
++			widget, priv->style_hint,
+ 			0, box_y,
+ 			priv->col0_width, row_height);
+ 
+-		gtk_paint_layout (dark_style, widget->window,
+-			GTK_STATE_NORMAL, FALSE, &event->area,
++		gtk_paint_layout (dark_style, cr,
++			GTK_STATE_NORMAL, FALSE,
+ 			widget, priv->style_hint,
+ 			(priv->col0_width / 2) - (text_width / 2),
+ 			box_y + (row_height / 2) - (text_height / 2),
+@@ -665,16 +677,16 @@ jana_gtk_day_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 	}
+ 	
+ 	/* Week */
+-	paint_box (widget->style, widget->window,
++	paint_box (gtk_widget_get_style (widget), cr,
+ 		GTK_STATE_NORMAL, GTK_SHADOW_OUT,
+-		&event->area, widget, priv->style_hint, 0, 0,
+-		priv->col0_width, priv->layout24hr->allocation.height);
++		widget, priv->style_hint, 0, 0,
++		priv->col0_width, allocation.height);
+ 
+ 	pango_layout_get_pixel_size (priv->week_layout,
+ 		&text_width, &text_height);
+ 
+-	gtk_paint_layout (widget->style, widget->window,
+-		GTK_STATE_NORMAL, FALSE, &event->area,
++	gtk_paint_layout (gtk_widget_get_style (widget), cr,
++		GTK_STATE_NORMAL, FALSE,
+ 		widget, priv->style_hint,
+ 		(priv->col0_width / 2) - (text_width / 2),
+ 		(priv->row0_height / 2) - (text_height / 2),
+@@ -693,13 +705,16 @@ relayout (JanaGtkDayView *self)
+ 	gint cell_width, min_time, max_time, alloc_height, event_y, day,
+ 		max_event_y;
+ 	gfloat min_per_pixel;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+ 	
+ 	if ((!jana_duration_valid (priv->range)) || (priv->cells == 0))
+ 		return;
+ 
+-	cell_width = priv->layout->allocation.width / priv->visible_days;
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
++	cell_width = allocation.width / priv->visible_days;
+ 	min_time = (jana_time_get_hours (priv->range->start) * 60) +
+ 		jana_time_get_minutes (priv->range->start);
+ 	max_time = ((jana_time_get_hours (priv->range->end) ?
+@@ -707,8 +722,8 @@ relayout (JanaGtkDayView *self)
+ 		jana_time_get_minutes (priv->range->end);
+ 	
+ 	/* TODO: Use integer math for this */
+-	alloc_height = priv->layout->allocation.height -
+-		(priv->layout->allocation.height % priv->cells);
++	alloc_height = allocation.height -
++		(allocation.height % priv->cells);
+ 	min_per_pixel = (gfloat)alloc_height / (gfloat)(max_time - min_time);
+ 	
+ 	cells = jana_gtk_tree_layout_get_cells (
+@@ -911,21 +926,13 @@ relayout (JanaGtkDayView *self)
+ 	}
+ 	
+ 	gtk_widget_set_size_request (priv->alignment24hr,
+-		priv->layout->allocation.width + priv->col0_width, max_event_y);
++		allocation.width + priv->col0_width, max_event_y);
+ 	
+ 	g_list_free (cells);
+ 	g_object_unref (time);
+ }
+ 
+ static void
+-size_request_cb (GtkWidget *widget, GtkRequisition *requisition,
+-		 JanaGtkDayView *self)
+-{
+-	requisition->width = 0;
+-	requisition->height = 0;
+-}
+-
+-static void
+ size_allocate_cb (GtkWidget *widget, GtkAllocation *allocation,
+ 		  JanaGtkDayView *self)
+ {
+@@ -958,16 +965,18 @@ start_selection (JanaGtkDayView *self, gint x, gint y)
+ {
+ 	JanaTime *start, *end;
+ 	gint alloc_height;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+-	
+-	alloc_height = priv->layout->allocation.height -
+-		(priv->layout->allocation.height % priv->cells);
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
++	alloc_height = allocation.height -
++		(allocation.height % priv->cells);
+ 	x = x + 1;
+ 	y = MIN (y, alloc_height - 1);
+ 
+-	priv->selection_start_x = (x * priv->visible_days) /
+-		priv->layout->allocation.width;
++	priv->selection_start_x = (x * priv->visible_days) / allocation.width;
+ 	priv->selection_start_y = (y * priv->cells) / alloc_height;
+ 	priv->selection_end_x = priv->selection_start_x;
+ 	priv->selection_end_y = priv->selection_start_y + 1;
+@@ -993,19 +1002,22 @@ end_selection (JanaGtkDayView *self, gint x, gint y)
+ {
+ 	static gint last_day_offset = 0, last_minute_offset = 0;
+ 	gint alloc_height;
++	GtkAllocation allocation = { 0 };
+ 	
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+-	
+-	alloc_height = priv->layout->allocation.height -
+-		(priv->layout->allocation.height % priv->cells);
+-	x = MAX (MIN (x + 1, priv->layout->allocation.width), 0);
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
++	alloc_height = allocation.height -
++		(allocation.height % priv->cells);
++	x = MAX (MIN (x + 1, allocation.width), 0);
+ 	y = MAX (MIN (y + 1, alloc_height), 0);
+ 
+ 	/* Check against the last end offset so we don't change/redraw the
+ 	 * selection unnecessarily.
+ 	 */
+ 	priv->selection_end_x = (x * priv->visible_days) /
+-		priv->layout->allocation.width;
++		allocation.width;
+ 	priv->selection_end_y = (((y * priv->cells) / alloc_height) + 1);
+ 	if ((priv->selection_end_x == last_day_offset) &&
+ 	    (priv->selection_end_y == last_minute_offset)) return;
+@@ -1116,23 +1128,26 @@ adjustment_changed_cb (GtkAdjustment *adjustment, JanaGtkDayView *self)
+ {
+ 	GdkRectangle rect;
+ 	JanaGtkDayViewPrivate *priv;
+-	
+-	if (!GTK_WIDGET (self)->window) return;
++	GtkAllocation allocation = { 0 };
++
++	if (!gtk_widget_get_window (GTK_WIDGET (self))) return;
+ 	priv = DAY_VIEW_PRIVATE (self);
+-	
++
++	gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
++
+ 	/* Invalidate the headers */
+ 	rect.x = 0;
+ 	rect.y = 0;
+-	rect.width = GTK_WIDGET (self)->allocation.width;
++	rect.width = allocation.width;
+ 	rect.height = priv->row0_height;
+ 	
+-	gdk_window_invalidate_rect (GTK_WIDGET (self)->window, &rect, FALSE);
++	gdk_window_invalidate_rect (gtk_widget_get_window (GTK_WIDGET (self)), &rect, FALSE);
+ 
+ 	rect.width = priv->col0_width;
+-	rect.height = GTK_WIDGET (self)->allocation.height;
++	rect.height = allocation.height;
+ 
+-	gdk_window_invalidate_rect (GTK_WIDGET (self)->window, &rect, FALSE);
+-	gdk_window_process_updates (GTK_WIDGET (self)->window, FALSE);
++	gdk_window_invalidate_rect (gtk_widget_get_window (GTK_WIDGET (self)), &rect, FALSE);
++	gdk_window_process_updates (gtk_widget_get_window (GTK_WIDGET (self)), FALSE);
+ }
+ 
+ static void
+@@ -1177,44 +1192,6 @@ jana_gtk_day_view_set_scroll_adjustments (JanaGtkDayView *self,
+ 	}
+ }
+ 
+-/* Generated with glib-genmarshal and tidied */
+-static void
+-marshal_VOID__OBJECT_OBJECT (GClosure *closure, GValue *return_value,
+-			     guint n_param_values, const GValue *param_values,
+-			     gpointer invocation_hint, gpointer marshal_data)
+-{
+-	typedef void (*GMarshalFunc_VOID__OBJECT_OBJECT) (
+-		gpointer data1, gpointer arg_1, gpointer arg_2, gpointer data2);
+-	register GMarshalFunc_VOID__OBJECT_OBJECT callback;
+-	register GCClosure *cc = (GCClosure*) closure;
+-	register gpointer data1, data2;
+-
+-	g_return_if_fail (n_param_values == 3);
+-
+-	if (G_CCLOSURE_SWAP_DATA (closure)) {
+-		data1 = closure->data;
+-		data2 = g_value_peek_pointer (param_values + 0);
+-	} else {
+-		data1 = g_value_peek_pointer (param_values + 0);
+-		data2 = closure->data;
+-	}
+-	callback = (GMarshalFunc_VOID__OBJECT_OBJECT)
+-		(marshal_data ? marshal_data : cc->callback);
+-
+-	callback (data1, g_value_get_object (param_values + 1),
+-		g_value_get_object (param_values + 2), data2);
+-}
+-
+-static void
+-jana_gtk_day_view_size_request (GtkWidget *widget, GtkRequisition *requisition)
+-{
+-	GTK_WIDGET_CLASS (jana_gtk_day_view_parent_class)->
+-		size_request (widget, requisition);
+-	
+-	requisition->width = 0;
+-	requisition->height = 0;
+-}
+-
+ static void
+ jana_gtk_day_view_class_init (JanaGtkDayViewClass *klass)
+ {
+@@ -1228,22 +1205,10 @@ jana_gtk_day_view_class_init (JanaGtkDayViewClass *klass)
+ 	object_class->dispose = jana_gtk_day_view_dispose;
+ 	object_class->finalize = jana_gtk_day_view_finalize;
+ 	
+-	widget_class->size_request = jana_gtk_day_view_size_request;
+-	widget_class->expose_event = jana_gtk_day_view_expose_event;
+-	widget_class->set_scroll_adjustments_signal =
+-		g_signal_new ("set_scroll_adjustments",
+-			G_OBJECT_CLASS_TYPE (object_class),
+-			G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+-			G_STRUCT_OFFSET (JanaGtkDayViewClass,
+-					 set_scroll_adjustments),
+-			NULL, NULL,
+-			marshal_VOID__OBJECT_OBJECT,
+-			G_TYPE_NONE, 2,
+-			GTK_TYPE_ADJUSTMENT,
+-			GTK_TYPE_ADJUSTMENT);
+-	
+-	klass->set_scroll_adjustments =
+-		jana_gtk_day_view_set_scroll_adjustments;
++	widget_class->draw = jana_gtk_day_view_draw;
++
++	/* TODO: Implement GtkScrollable interface on the widget
++		jana_gtk_day_view_set_scroll_adjustments; */
+ 	
+ 	g_object_class_install_property (
+ 		object_class,
+@@ -1453,10 +1418,10 @@ adjustment_changed_after_size_allocate_cb (GtkAdjustment *adjustment,
+ 	 * reflect the new visible size
+ 	 */
+ 	diff1 = upper - lower;
+-	diff2 = adjustment->upper - adjustment->lower;
++	diff2 = gtk_adjustment_get_upper (adjustment) - gtk_adjustment_get_lower (adjustment);
+ 	if (diff1 != diff2) {
+ 		gtk_adjustment_set_value (adjustment,
+-			adjustment->value * (diff2 / diff1));
++			gtk_adjustment_get_value (adjustment) * (diff2 / diff1));
+ 	}
+ }
+ 
+@@ -1466,24 +1431,27 @@ viewport_size_allocate_cb (GtkWidget *widget, GtkAllocation *allocation,
+ {
+ 	static gdouble hlower, hupper, vlower, vupper;
+ 	gint size_x, size_y;
++	GtkAllocation layout_allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+-	
++
++	gtk_widget_get_allocation (priv->layout, &layout_allocation);
++
+ 	size_x = (gint)((gdouble)allocation->width / priv->xratio);
+ 	size_y = (gint)((gdouble)allocation->height / priv->yratio);
+ 	
+-	if ((priv->layout->allocation.width != size_x) ||
+-	    (priv->layout->allocation.height != size_y)) {
++	if ((layout_allocation.width != size_x) ||
++	    (layout_allocation.height != size_y)) {
+ 		GtkAdjustment *hadjustment, *vadjustment;
+ 		hadjustment = gtk_viewport_get_hadjustment (
+ 			GTK_VIEWPORT (widget));
+ 		vadjustment = gtk_viewport_get_vadjustment (
+ 			GTK_VIEWPORT (widget));
+ 		
+-		hlower = hadjustment->lower;
+-		hupper = hadjustment->upper;
+-		vlower = vadjustment->lower;
+-		vupper = vadjustment->upper;
++		hlower = gtk_adjustment_get_lower (hadjustment);
++		hupper = gtk_adjustment_get_upper (hadjustment);
++		vlower = gtk_adjustment_get_lower (vadjustment);
++		vupper = gtk_adjustment_get_upper (vadjustment);
+ 
+ 		g_object_set_data (G_OBJECT (hadjustment), "lower", &hlower);
+ 		g_object_set_data (G_OBJECT (hadjustment), "upper", &hupper);
+@@ -1688,10 +1656,6 @@ jana_gtk_day_view_init (JanaGtkDayView *self)
+ 		"draw_detail", FALSE, NULL);
+ 	
+ 	/* Resizing events */
+-	g_signal_connect (priv->layout, "size-request",
+-		G_CALLBACK (size_request_cb), self);
+-	g_signal_connect (priv->layout24hr, "size-request",
+-		G_CALLBACK (size_request_cb), self);
+ 	g_signal_connect (priv->layout, "size-allocate",
+ 		G_CALLBACK (size_allocate_cb), self);
+ 
+@@ -1716,10 +1680,10 @@ jana_gtk_day_view_init (JanaGtkDayView *self)
+ 		G_CALLBACK (cell_activated_cb), self);
+ 	
+ 	/* Drawing callbacks */
+-	g_signal_connect (priv->layout, "expose-event",
+-		G_CALLBACK (layout_expose_event_cb), self);
+-	g_signal_connect (priv->layout24hr, "expose-event",
+-		G_CALLBACK (layout24hr_expose_event_cb), self);
++	g_signal_connect (priv->layout, "draw",
++		G_CALLBACK (layout_draw_cb), self);
++	g_signal_connect (priv->layout24hr, "draw",
++		G_CALLBACK (layout24hr_draw_cb), self);
+ }
+ 
+ /**
+@@ -1959,6 +1923,7 @@ void
+ jana_gtk_day_view_scroll_to_cell (JanaGtkDayView *self, guint x, guint y)
+ {
+ 	GtkAdjustment *hadjustment, *vadjustment;
++	GtkAllocation allocation = { 0 };
+ 
+ 	JanaGtkDayViewPrivate *priv = DAY_VIEW_PRIVATE (self);
+ 	
+@@ -1966,18 +1931,20 @@ jana_gtk_day_view_scroll_to_cell (JanaGtkDayView *self, guint x, guint y)
+ 		GTK_VIEWPORT (priv->viewport));
+ 	vadjustment = gtk_viewport_get_vadjustment (
+ 		GTK_VIEWPORT (priv->viewport));
+-	
+-	x *= (priv->layout->allocation.width -
+-	      (priv->layout->allocation.width % priv->visible_days)) /
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
++	x *= (allocation.width -
++	      (allocation.width % priv->visible_days)) /
+ 		priv->visible_days;
+-	y *= (priv->layout->allocation.height -
+-	      (priv->layout->allocation.width % priv->cells)) /
++	y *= (allocation.height -
++	      (allocation.width % priv->cells)) /
+ 		priv->cells;
+ 	
+-	hadjustment->value = MIN (x,
+-		hadjustment->upper - hadjustment->page_size);
+-	vadjustment->value = MIN (y + vadjustment->lower,
+-		vadjustment->upper - vadjustment->page_size);
++	gtk_adjustment_set_value (hadjustment, MIN (x,
++		gtk_adjustment_get_upper (hadjustment) - gtk_adjustment_get_page_size (hadjustment)));
++	gtk_adjustment_set_value (vadjustment, MIN (y + gtk_adjustment_get_lower (vadjustment),
++		gtk_adjustment_get_upper (vadjustment) - gtk_adjustment_get_page_size (vadjustment)));
+ 	
+ 	gtk_adjustment_value_changed (hadjustment);
+ 	gtk_adjustment_value_changed (vadjustment);
+@@ -2083,6 +2050,7 @@ recalculate_cell_coords (JanaGtkDayView *self, gboolean active,
+ 		}
+ 		
+ 		if (priv->highlighted_time) {
++			GtkAllocation allocation = { 0 };
+ 			gint days, mins, mins_in_day, alloc_height;
+ 			/* Get how many minutes into the day the highlighted 
+ 			 * time is, how many minutes there are per day visible, 
+@@ -2096,8 +2064,11 @@ recalculate_cell_coords (JanaGtkDayView *self, gboolean active,
+ 				priv->range->end, NULL, NULL, &days,
+ 				NULL, &mins_in_day, NULL);
+ 			if (!mins_in_day) mins_in_day = 24 * 60;
+-			alloc_height = priv->layout->allocation.height -
+-				(priv->layout->allocation.height % priv->cells);
++
++			gtk_widget_get_allocation (priv->layout, &allocation);
++
++			alloc_height = allocation.height -
++				(allocation.height % priv->cells);
+ 			
+ 			time_to_cell_coords (self, priv->highlighted_time,
+ 				&priv->highlighted_time_x,
+diff --git a/libjana-gtk/jana-gtk-month-view.c b/libjana-gtk/jana-gtk-month-view.c
+index 224b1d6..a74ce8a 100644
+--- a/libjana-gtk/jana-gtk-month-view.c
++++ b/libjana-gtk/jana-gtk-month-view.c
+@@ -193,7 +193,7 @@ jana_gtk_month_view_finalize (GObject *object)
+ }
+ 
+ static gboolean
+-jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
++jana_gtk_month_view_draw (GtkWidget *widget, cairo_t *cr)
+ {
+ 	JanaTime *time;
+ 	gint week;
+@@ -202,25 +202,28 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 	GtkStyle *dark_style, *light_style, *style;
+ 	PangoLayout *layout;
+ 	JanaGtkMonthViewPrivate *priv = MONTH_VIEW_PRIVATE (widget);
+-	
++	GtkAllocation allocation = { 0 };
++
+ 	if (!priv->month) return FALSE;
+-	
++
++	gtk_widget_get_allocation (widget, &allocation);
++
+ 	/* Draw background */
+ 	box_y = 0;
+-	row_height = widget->allocation.height / (priv->visible_weeks + 1);
++	row_height = allocation.height / (priv->visible_weeks + 1);
+ 
+ 	layout = gtk_widget_create_pango_layout (widget, NULL);
+ 
+-	dark_style = gtk_style_copy (widget->style);
++	dark_style = gtk_style_copy (gtk_widget_get_style (widget));
+ 	dark_style->bg[GTK_STATE_NORMAL] = dark_style->bg[GTK_STATE_ACTIVE];
+ 	dark_style->fg[GTK_STATE_NORMAL] = dark_style->fg[GTK_STATE_ACTIVE];
+-	dark_style = gtk_style_attach (dark_style, widget->window);
++	dark_style = gtk_style_attach (dark_style, gtk_widget_get_window (widget));
+ 
+-	light_style = gtk_style_copy (widget->style);
++	light_style = gtk_style_copy (gtk_widget_get_style (widget));
+ 	light_style->bg[GTK_STATE_NORMAL] = light_style->base[GTK_STATE_NORMAL];
+ 	light_style->bg[GTK_STATE_SELECTED] =
+ 		light_style->base[GTK_STATE_SELECTED];
+-	light_style = gtk_style_attach (light_style, widget->window);
++	light_style = gtk_style_attach (light_style, gtk_widget_get_window (widget));
+ 	
+ 	time = jana_time_duplicate (priv->start);
+ 
+@@ -253,9 +256,9 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 					 */
+ 					col0_width += priv->spacing * 2;
+ 					row0_height += priv->spacing * 2;
+-					col_width = (widget->allocation.width -
++					col_width = (allocation.width -
+ 						col0_width) / 7;
+-					row_height = (widget->allocation.height-
++					row_height = (allocation.height-
+ 						row0_height) /
+ 						priv->visible_weeks;
+ 					
+@@ -312,14 +315,14 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 			if (y == 0) box_height = row0_height;
+ 			else box_height = row_height;
+ 			
+-			gtk_paint_flat_box (style, widget->window,
++			gtk_paint_flat_box (style, cr,
+ 				state, shadow,
+-				&event->area, widget, priv->style_hint,
++				widget, priv->style_hint,
+ 				box_x, box_y,
+ 				box_width, box_height);
+-			gtk_paint_shadow (style, widget->window,
++			gtk_paint_shadow (style, cr,
+ 				state, shadow,
+-				&event->area, widget, priv->style_hint,
++				widget, priv->style_hint,
+ 				box_x, box_y,
+ 				box_width, box_height);
+ 			
+@@ -327,8 +330,8 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 				layout, &text_width, &text_height);
+ 			
+ 			if ((x == 0) || (y == 0))
+-				gtk_paint_layout (style, widget->window,
+-					state, FALSE, &event->area,
++				gtk_paint_layout (style, cr,
++					state, FALSE,
+ 					widget, priv->style_hint,
+ 					box_x + (box_width / 2) -
+ 						  (text_width / 2),
+@@ -343,7 +346,7 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 	gtk_style_detach (dark_style);
+ 	
+ 	GTK_WIDGET_CLASS (jana_gtk_month_view_parent_class)->
+-		expose_event (widget, event);
++		draw (widget, cr);
+ 	
+ 	/* Draw date labels */
+ 	jana_utils_time_copy (priv->start, time);
+@@ -379,8 +382,8 @@ jana_gtk_month_view_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 			pango_layout_get_pixel_size (
+ 				layout, &text_width, &text_height);
+ 			
+-			gtk_paint_layout (light_style, widget->window,
+-				state, TRUE, &event->area,
++			gtk_paint_layout (light_style, cr,
++				state, TRUE,
+ 				widget, priv->style_hint,
+ 				(x * col_width) + (col_width / 2) +
+ 					col0_width - (text_width / 2),
+@@ -407,6 +410,7 @@ relayout (JanaGtkMonthView *self)
+ 	JanaTime *time;
+ 	GList *cell, *cells;
+ 	JanaGtkMonthViewPrivate *priv = MONTH_VIEW_PRIVATE (self);
++	GtkAllocation allocation = { 0 };
+ 
+ 	if (!priv->month) return;
+ 	
+@@ -414,10 +418,12 @@ relayout (JanaGtkMonthView *self)
+ 		JANA_GTK_TREE_LAYOUT (priv->layout));
+ 	
+ 	if (!cells) return;
+-	
++
++	gtk_widget_get_allocation (priv->layout, &allocation);
++
+ 	/* Place cells in their day boxes, 4 events per box */
+-	width = priv->layout->allocation.width / 7;
+-	height = priv->layout->allocation.height / priv->visible_weeks;
++	width = allocation.width / 7;
++	height = allocation.height / priv->visible_weeks;
+ 	cell = cells;
+ 	time = jana_time_duplicate (priv->start);
+ 	for (y = 0; (y < priv->visible_weeks) && (cell); y++) {
+@@ -526,14 +532,6 @@ relayout (JanaGtkMonthView *self)
+ }
+ 
+ static void
+-size_request_cb (GtkWidget *widget, GtkRequisition *requisition,
+-		 JanaGtkMonthView *self)
+-{
+-	requisition->width = 0;
+-	requisition->height = 0;
+-}
+-
+-static void
+ size_allocate_cb (GtkWidget *widget, GtkAllocation *allocation,
+ 		  JanaGtkMonthView *self)
+ {
+@@ -554,16 +552,19 @@ button_press_event_cb (GtkWidget *layout, GdkEventButton *event,
+ 	JanaTime *date;
+ 	gint day_increment;
+ 	JanaGtkMonthViewPrivate *priv = MONTH_VIEW_PRIVATE (self);
++	GtkAllocation allocation = { 0 };
+ 
+ 	if (!priv->month) return FALSE;
+ 	
++	gtk_widget_get_allocation (layout, &allocation);
++
+ 	/* Work out which day box (and thereby, date) was clicked */
+ 	date = jana_time_duplicate (priv->start);
+-	day_increment = 6 - (((layout->allocation.width -
+-		(gint)event->x + 1) * 7) / layout->allocation.width);
++	day_increment = 6 - (((allocation.width -
++		(gint)event->x + 1) * 7) / allocation.width);
+ 	day_increment += ((priv->visible_weeks - 1) -
+-		(((layout->allocation.height - (gint)event->y + 1) *
+-		  priv->visible_weeks) / layout->allocation.height)) * 7;
++		(((allocation.height - (gint)event->y + 1) *
++		  priv->visible_weeks) / allocation.height)) * 7;
+ 	jana_time_set_day (date, jana_time_get_day (date) + day_increment);
+ 	
+ 	if (priv->selection)
+@@ -589,7 +590,7 @@ jana_gtk_month_view_class_init (JanaGtkMonthViewClass *klass)
+ 	object_class->dispose = jana_gtk_month_view_dispose;
+ 	object_class->finalize = jana_gtk_month_view_finalize;
+ 	
+-	widget_class->expose_event = jana_gtk_month_view_expose_event;
++	widget_class->draw = jana_gtk_month_view_draw;
+ 
+ 	g_object_class_install_property (
+ 		object_class,
+@@ -734,8 +735,6 @@ jana_gtk_month_view_init (JanaGtkMonthView *self)
+ 	g_object_set (G_OBJECT (priv->event_renderer),
+ 		"draw_text", FALSE, NULL);
+ 	
+-	g_signal_connect (priv->layout, "size-request",
+-		G_CALLBACK (size_request_cb), self);
+ 	g_signal_connect (priv->layout, "size-allocate",
+ 		G_CALLBACK (size_allocate_cb), self);
+ 	g_signal_connect (priv->layout, "button-press-event",
+diff --git a/libjana-gtk/jana-gtk-recurrence.c b/libjana-gtk/jana-gtk-recurrence.c
+index ec550da..59aef76 100644
+--- a/libjana-gtk/jana-gtk-recurrence.c
++++ b/libjana-gtk/jana-gtk-recurrence.c
+@@ -70,33 +70,33 @@ fill_type_combo (JanaGtkRecurrence *self)
+ 	
+ 	/* Daily */
+ 	recur_string = jana_utils_recurrence_to_string (recur, NULL);
+-	gtk_combo_box_insert_text (GTK_COMBO_BOX (priv->type_combo), 1,
++	gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT (priv->type_combo), 1,
+ 		recur_string);
+-	gtk_combo_box_remove_text (GTK_COMBO_BOX (priv->type_combo), 2);
++	gtk_combo_box_text_remove (GTK_COMBO_BOX_TEXT (priv->type_combo), 2);
+ 	g_free (recur_string);
+ 
+ 	/* Weekly */
+ 	recur->type = JANA_RECURRENCE_WEEKLY;
+ 	recur_string = jana_utils_recurrence_to_string (recur, NULL);
+-	gtk_combo_box_insert_text (GTK_COMBO_BOX (priv->type_combo), 2,
++	gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT (priv->type_combo), 2,
+ 		recur_string);
+-	gtk_combo_box_remove_text (GTK_COMBO_BOX (priv->type_combo), 3);
++	gtk_combo_box_text_remove (GTK_COMBO_BOX_TEXT (priv->type_combo), 3);
+ 	g_free (recur_string);
+ 
+ 	/* Monthly */
+ 	recur->type = JANA_RECURRENCE_MONTHLY;
+ 	recur_string = jana_utils_recurrence_to_string (recur, NULL);
+-	gtk_combo_box_insert_text (GTK_COMBO_BOX (priv->type_combo), 3,
++	gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT (priv->type_combo), 3,
+ 		recur_string);
+-	gtk_combo_box_remove_text (GTK_COMBO_BOX (priv->type_combo), 4);
++	gtk_combo_box_text_remove (GTK_COMBO_BOX_TEXT (priv->type_combo), 4);
+ 	g_free (recur_string);
+ 
+ 	/* Yearly */
+ 	recur->type = JANA_RECURRENCE_YEARLY;
+ 	recur_string = jana_utils_recurrence_to_string (recur, NULL);
+-	gtk_combo_box_insert_text (GTK_COMBO_BOX (priv->type_combo), 4,
++	gtk_combo_box_text_insert_text (GTK_COMBO_BOX_TEXT (priv->type_combo), 4,
+ 		recur_string);
+-	gtk_combo_box_remove_text (GTK_COMBO_BOX (priv->type_combo), 5);
++	gtk_combo_box_text_remove (GTK_COMBO_BOX_TEXT (priv->type_combo), 5);
+ 	g_free (recur_string);
+ 	
+ 	jana_recurrence_free (recur);
+@@ -249,7 +249,7 @@ jana_gtk_recurrence_style_set (GtkWidget *widget, GtkStyle *previous_style)
+ 	JanaGtkRecurrencePrivate *priv = RECURRENCE_PRIVATE (widget);
+ 	
+ 	gtk_widget_modify_base (priv->preview_textview, GTK_STATE_NORMAL,
+-		&widget->style->bg[GTK_STATE_NORMAL]);
++		&gtk_widget_get_style (widget)->bg[GTK_STATE_NORMAL]);
+ 	
+ 	GTK_WIDGET_CLASS (jana_gtk_recurrence_parent_class)->
+ 		style_set (widget, previous_style);
+@@ -410,7 +410,7 @@ close_clicked_cb (GtkButton *button, JanaGtkDateTime *datetime)
+ 		g_object_get_data (G_OBJECT (window), "self");
+ 	priv = RECURRENCE_PRIVATE (self);
+ 	
+-	if (GTK_WIDGET_SENSITIVE (datetime)) {
++	if (gtk_widget_is_sensitive (GTK_WIDGET (datetime))) {
+ 		JanaTime *time = jana_gtk_date_time_get_time (datetime);
+ 		if (jana_utils_time_compare (time, priv->time, TRUE) > 0) {
+ 			if (priv->recur->end) g_object_unref (priv->recur->end);
+@@ -437,7 +437,7 @@ end_clicked_cb (GtkButton *button, JanaGtkRecurrence *self)
+ 	/* Time-editing dialog */
+ 	toplevel = gtk_widget_get_toplevel (GTK_WIDGET (button));
+ 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+-	if (GTK_WIDGET_TOPLEVEL (toplevel))
++	if (gtk_widget_is_toplevel (toplevel))
+ 		gtk_window_set_transient_for (GTK_WINDOW (window),
+ 			GTK_WINDOW (toplevel));
+ 	gtk_window_set_modal (GTK_WINDOW (window), TRUE);
+@@ -510,13 +510,13 @@ jana_gtk_recurrence_init (JanaGtkRecurrence *self)
+ 	gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+ 	gtk_size_group_add_widget (size_group, label);
+ 	gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, TRUE, 0);
+-	priv->type_combo = gtk_combo_box_new_text ();
+-	gtk_combo_box_append_text (GTK_COMBO_BOX (priv->type_combo), "None");
+-	gtk_combo_box_append_text (GTK_COMBO_BOX (priv->type_combo),
++	priv->type_combo = gtk_combo_box_text_new ();
++	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (priv->type_combo), "None");
++	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (priv->type_combo),
+ 		"Every day");
+-	gtk_combo_box_append_text (GTK_COMBO_BOX (priv->type_combo),
++	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (priv->type_combo),
+ 		"Every week");
+-	gtk_combo_box_append_text (GTK_COMBO_BOX (priv->type_combo),
++	gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (priv->type_combo),
+ 		"Every year");
+ 	gtk_combo_box_set_active (GTK_COMBO_BOX (priv->type_combo), 0);
+ 	gtk_box_pack_start (GTK_BOX (hbox), priv->type_combo, TRUE, TRUE, 0);
+diff --git a/libjana-gtk/jana-gtk-tree-layout.c b/libjana-gtk/jana-gtk-tree-layout.c
+index ec64c73..740c827 100644
+--- a/libjana-gtk/jana-gtk-tree-layout.c
++++ b/libjana-gtk/jana-gtk-tree-layout.c
+@@ -147,17 +147,20 @@ tree_layout_row_changed_cb (GtkTreeModel *model, GtkTreePath *path,
+ 	gtk_tree_row_reference_free (row);
+ 	
+ 	if (info_list) {
++		GtkAllocation allocation = { 0 };
+ 		JanaGtkTreeLayoutCellInfo *info =
+ 			(JanaGtkTreeLayoutCellInfo *)info_list->data;
+-		
++
++		gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
++
+ 		if (priv->sort_cb) {
+ 			priv->cells = g_list_sort_with_data (priv->cells,
+ 				priv->sort_cb, priv->sort_data);
+ 		}
+ 		
+ 		gtk_widget_queue_draw_area (GTK_WIDGET (self),
+-			info->real_x + GTK_WIDGET (self)->allocation.x,
+-			info->real_y + GTK_WIDGET (self)->allocation.y,
++			info->real_x + allocation.x,
++			info->real_y + allocation.y,
+ 			info->real_width, info->real_height);
+ 		
+ 		if (priv->visible_cb) {
+@@ -367,10 +370,13 @@ tree_layout_set_properties (JanaGtkTreeLayoutCellInfo *info)
+ }
+ 
+ static gboolean
+-jana_gtk_tree_layout_expose_event (GtkWidget *widget, GdkEventExpose *event)
++jana_gtk_tree_layout_draw (GtkWidget *widget, cairo_t *cr)
+ {
+ 	GList *c;
+ 	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (widget);
++	GtkAllocation allocation = { 0 };
++
++	gtk_widget_get_allocation (widget, &allocation);
+ 	
+ 	/* Draw these in the reverse order to how we handle mouse operations,
+ 	 * that way cells that obscure other cells appear to have priority.
+@@ -382,11 +388,11 @@ jana_gtk_tree_layout_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 			(JanaGtkTreeLayoutCellInfo *)c->data;
+ 		
+ 		if ((info->real_width < 0) || (info->real_height < 0)) continue;
+-		
++
+ 		tree_layout_set_properties (info);
+ 		
+-		cell_area.x = info->real_x + widget->allocation.x;
+-		cell_area.y = info->real_y + widget->allocation.y;
++		cell_area.x = info->real_x + allocation.x;
++		cell_area.y = info->real_y + allocation.y;
+ 		cell_area.width = info->real_width;
+ 		cell_area.height = info->real_height;
+ 		
+@@ -396,8 +402,8 @@ jana_gtk_tree_layout_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 		if (!info->sensitive)
+ 			state |= GTK_CELL_RENDERER_INSENSITIVE;
+ 		
+-		gtk_cell_renderer_render (info->renderer, widget->window,
+-			widget, &cell_area, &cell_area, &event->area, state);
++		gtk_cell_renderer_render (info->renderer, cr,
++			widget, &cell_area, &cell_area, state);
+ 	}
+ 	
+ 	return FALSE;
+@@ -429,19 +435,25 @@ tree_layout_get_size (JanaGtkTreeLayout *self, gint *width, gint *height)
+ }
+ 
+ static void
+-jana_gtk_tree_layout_size_request (GtkWidget *widget,
+-				   GtkRequisition *requisition)
++jana_gtk_tree_layout_get_preferred_width (GtkWidget *widget, gint *minimum_width, gint *natural_width)
+ {
+ 	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (widget);
+ 
+-	requisition->width = 0;
+-	requisition->height = 0;
+-	
+-	if (priv->fill_width && priv->fill_height) return;
+-	
+-	tree_layout_get_size (JANA_GTK_TREE_LAYOUT (widget),
+-		priv->fill_width ? NULL : &requisition->width,
+-		priv->fill_height ? NULL : &requisition->height);
++	if (!priv->fill_width) {
++		tree_layout_get_size (JANA_GTK_TREE_LAYOUT (widget), minimum_width, NULL);
++		*natural_width = *minimum_width;
++	}
++}
++
++static void
++jana_gtk_tree_layout_get_preferred_height (GtkWidget *widget, gint *minimum_height, gint *natural_height)
++{
++	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (widget);
++
++	if (!priv->fill_height) {
++		tree_layout_get_size (JANA_GTK_TREE_LAYOUT (widget), NULL, minimum_height);
++		*natural_height = *minimum_height;
++	}
+ }
+ 
+ static void
+@@ -554,6 +566,9 @@ jana_gtk_tree_layout_button_press_event (GtkWidget *widget,
+ 	GList *info_list;
+ 	JanaGtkTreeLayoutCellInfo *info;
+ 	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (widget);
++	GtkAllocation allocation = { 0 };
++
++	gtk_widget_get_allocation (widget, &allocation);
+ 
+ 	if (priv->select_mode == GTK_SELECTION_NONE) {
+ 		GdkPoint point;
+@@ -611,8 +626,8 @@ jana_gtk_tree_layout_button_press_event (GtkWidget *widget,
+ 				(JanaGtkTreeLayoutCellInfo *)
+ 					info_list->data;
+ 			gtk_widget_queue_draw_area (widget,
+-				old_info->real_x + widget->allocation.x,
+-				old_info->real_y + widget->allocation.y,
++				old_info->real_x + allocation.x,
++				old_info->real_y + allocation.y,
+ 				old_info->real_width,
+ 				old_info->real_height);
+ 		}
+@@ -632,8 +647,8 @@ jana_gtk_tree_layout_button_press_event (GtkWidget *widget,
+ 				priv->select = g_list_remove (
+ 					priv->select, info);
+ 				gtk_widget_queue_draw_area (widget,
+-					info->real_x + widget->allocation.x,
+-					info->real_y + widget->allocation.y,
++					info->real_x + allocation.x,
++					info->real_y + allocation.y,
+ 					info->real_width, info->real_height);
+ 
+ 				if (!priv->select_idle) priv->select_idle =
+@@ -687,8 +702,8 @@ jana_gtk_tree_layout_button_press_event (GtkWidget *widget,
+ 		if (info->sensitive) {
+ 			priv->select = g_list_prepend (priv->select, info);
+ 			gtk_widget_queue_draw_area (widget,
+-				info->real_x + widget->allocation.x,
+-				info->real_y + widget->allocation.y,
++				info->real_x + allocation.x,
++				info->real_y + allocation.y,
+ 				info->real_width, info->real_height);
+ 			if (!priv->select_idle) priv->select_idle =
+ 				g_idle_add (select_idle_cb, widget);
+@@ -705,6 +720,9 @@ jana_gtk_tree_layout_motion_notify_event (GtkWidget *widget,
+ 	GdkPoint point;
+ 	GList *info_list;
+ 	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (widget);
++	GtkAllocation allocation = { 0 };
++
++	gtk_widget_get_allocation (widget, &allocation);
+ 
+ 	/* Find the cell we're hovered over and redraw it if necessary */
+ 	point.x = event->x;
+@@ -718,22 +736,22 @@ jana_gtk_tree_layout_motion_notify_event (GtkWidget *widget,
+ 				gtk_widget_queue_draw_area (
+ 					widget,
+ 					priv->hover->real_x +
+-						widget->allocation.x,
++						allocation.x,
+ 					priv->hover->real_y +
+-						widget->allocation.y,
++						allocation.y,
+ 					priv->hover->real_width,
+ 					priv->hover->real_height);
+ 			priv->hover = info;
+ 			gtk_widget_queue_draw_area (widget,
+-				priv->hover->real_x + widget->allocation.x,
+-				priv->hover->real_y + widget->allocation.y,
++				priv->hover->real_x + allocation.x,
++				priv->hover->real_y + allocation.y,
+ 				priv->hover->real_width,
+ 				priv->hover->real_height);
+ 		}
+ 	} else if (priv->hover) {
+ 		gtk_widget_queue_draw_area (widget,
+-			priv->hover->real_x + widget->allocation.x,
+-			priv->hover->real_y + widget->allocation.y,
++			priv->hover->real_x + allocation.x,
++			priv->hover->real_y + allocation.y,
+ 			priv->hover->real_width,
+ 			priv->hover->real_height);
+ 		priv->hover = NULL;
+@@ -756,8 +774,9 @@ jana_gtk_tree_layout_class_init (JanaGtkTreeLayoutClass *klass)
+ 	object_class->dispose = jana_gtk_tree_layout_dispose;
+ 	object_class->finalize = jana_gtk_tree_layout_finalize;
+ 	
+-	widget_class->expose_event = jana_gtk_tree_layout_expose_event;
+-	widget_class->size_request = jana_gtk_tree_layout_size_request;
++	widget_class->draw = jana_gtk_tree_layout_draw;
++	widget_class->get_preferred_width = jana_gtk_tree_layout_get_preferred_width;
++	widget_class->get_preferred_height = jana_gtk_tree_layout_get_preferred_height;
+ 	widget_class->size_allocate = jana_gtk_tree_layout_size_allocate;
+ 	widget_class->button_press_event =
+ 		jana_gtk_tree_layout_button_press_event;
+@@ -1166,6 +1185,9 @@ jana_gtk_tree_layout_set_cell_sensitive (JanaGtkTreeLayout *self,
+ {
+ 	JanaGtkTreeLayoutPrivate *priv = TREE_LAYOUT_PRIVATE (self);
+ 	GList *info_list = g_list_find_custom (priv->cells, row, find_row_cb);
++	GtkAllocation allocation = { 0 };
++
++	gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
+ 	
+ 	if (info_list) {
+ 		JanaGtkTreeLayoutCellInfo *info;
+@@ -1174,8 +1196,8 @@ jana_gtk_tree_layout_set_cell_sensitive (JanaGtkTreeLayout *self,
+ 		if (info->sensitive != sensitive) {
+ 			info->sensitive = sensitive;
+ 			gtk_widget_queue_draw_area (GTK_WIDGET (self),
+-				info->real_x + GTK_WIDGET (self)->allocation.x,
+-				info->real_y + GTK_WIDGET (self)->allocation.y,
++				info->real_x + allocation.x,
++				info->real_y + allocation.y,
+ 				info->real_width, info->real_height);
+ 		}
+ 	}
+diff --git a/libjana-gtk/jana-gtk-world-map-marker.h b/libjana-gtk/jana-gtk-world-map-marker.h
+index 528ee38..30499d6 100644
+--- a/libjana-gtk/jana-gtk-world-map-marker.h
++++ b/libjana-gtk/jana-gtk-world-map-marker.h
+@@ -22,7 +22,7 @@
+ #define _JANA_GTK_WORLD_MAP_MARKER_H
+ 
+ #include <glib-object.h>
+-#include <gtk/gtkwidget.h>
++#include <gtk/gtk.h>
+ 
+ G_BEGIN_DECLS
+ 
+diff --git a/libjana-gtk/jana-gtk-world-map.c b/libjana-gtk/jana-gtk-world-map.c
+index fc25e42..9db243f 100644
+--- a/libjana-gtk/jana-gtk-world-map.c
++++ b/libjana-gtk/jana-gtk-world-map.c
+@@ -618,20 +618,21 @@ draw_marks (JanaGtkWorldMap *self, cairo_t *cr)
+ 			marker->lat, marker->lon, &x, &y);
+ 		
+ 		cairo_save (cr);
+-		jana_gtk_world_map_marker_render (marker, widget->style, cr,
+-			GTK_WIDGET_STATE (widget), x, y);
++		jana_gtk_world_map_marker_render (marker, gtk_widget_get_style (widget), cr,
++			gtk_widget_get_state (widget), x, y);
+ 		cairo_restore (cr);
+ 	}
+ }
+ 
+ static gboolean
+-jana_gtk_world_map_expose_event (GtkWidget *widget, GdkEventExpose *event)
++jana_gtk_world_map_draw (GtkWidget *widget, cairo_t *cr)
+ {
+-	cairo_t *cr = gdk_cairo_create (widget->window);
+-	
++	GtkAllocation allocation = { 0 };
+ 	JanaGtkWorldMapPrivate *priv = WORLD_MAP_PRIVATE (widget);
+-	
+-	cairo_translate (cr, widget->allocation.x, widget->allocation.y);
++
++	gtk_widget_get_allocation (widget, &allocation);
++
++	cairo_translate (cr, allocation.x, allocation.y);
+ 	if (priv->buffer) {
+ 		cairo_pattern_t *pattern = cairo_pattern_create_for_surface (
+ 			priv->buffer);
+@@ -640,10 +641,10 @@ jana_gtk_world_map_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 			cairo_matrix_init_scale (&matrix,
+ 				(priv->width > 0) ?
+ 				((double)priv->width/
+-				 (double)widget->allocation.width) : 1.0,
++				 (double)allocation.width) : 1.0,
+ 				(priv->height > 0) ?
+ 				((double)priv->height/
+-				 (double)widget->allocation.height) : 1.0);
++				 (double)allocation.height) : 1.0);
+ 			cairo_pattern_set_matrix (pattern, &matrix);
+ 		}
+ 		cairo_set_source (cr, pattern);
+@@ -653,10 +654,8 @@ jana_gtk_world_map_expose_event (GtkWidget *widget, GdkEventExpose *event)
+ 
+ 	draw_marks ((JanaGtkWorldMap *)widget, cr);
+ 
+-	cairo_destroy (cr);
+-	
+ 	return GTK_WIDGET_CLASS (jana_gtk_world_map_parent_class)->
+-		expose_event (widget, event);
++		draw (widget, cr);
+ }
+ 
+ static void
+@@ -665,14 +664,14 @@ refresh_buffer (JanaGtkWorldMap *self)
+ 	JanaGtkWorldMapPrivate *priv = WORLD_MAP_PRIVATE (self);
+ 
+ 	priv->dirty = TRUE;
+-	if (!GTK_WIDGET_MAPPED (self)) return;
++	if (!gtk_widget_get_mapped (GTK_WIDGET (self))) return;
+ 	
+ 	stop_draw_thread (self);
+ 	priv->dirty = FALSE;
+ 	
+ 	if (!priv->buffer) return;
+ 	
+-	priv->style = gtk_style_copy (GTK_WIDGET (self)->style);
++	priv->style = gtk_style_copy (gtk_widget_get_style (GTK_WIDGET (self)));
+ 	priv->time_copy = priv->time ? jana_time_duplicate (priv->time) : NULL;
+ 	g_signal_emit (self, signals[RENDER_START], 0);
+ 	priv->draw_thread = g_thread_create ((GThreadFunc)draw_map,
+@@ -689,7 +688,7 @@ jana_gtk_world_map_size_allocate (GtkWidget *widget, GtkAllocation *allocation)
+ 	GTK_WIDGET_CLASS (jana_gtk_world_map_parent_class)->
+ 		size_allocate (widget, allocation);
+ 
+-	if (!GTK_WIDGET_REALIZED (widget)) gtk_widget_realize (widget);
++	if (!gtk_widget_get_realized (widget)) gtk_widget_realize (widget);
+ 
+ 	if (priv->scale) {
+ 		width = (priv->width > 0) ? priv->width : allocation->width;
+@@ -789,7 +788,7 @@ jana_gtk_world_map_class_init (JanaGtkWorldMapClass *klass)
+ 	object_class->dispose = jana_gtk_world_map_dispose;
+ 	object_class->finalize = jana_gtk_world_map_finalize;
+ 	
+-	widget_class->expose_event = jana_gtk_world_map_expose_event;
++	widget_class->draw = jana_gtk_world_map_draw;
+ 	widget_class->size_allocate = jana_gtk_world_map_size_allocate;
+ 	widget_class->map_event = jana_gtk_world_map_map_event;
+ 	widget_class->style_set = jana_gtk_world_map_style_set;
+@@ -917,17 +916,18 @@ void
+ jana_gtk_world_map_get_latlon (JanaGtkWorldMap *self, gint x, gint y,
+ 			       gdouble *lat, gdouble *lon)
+ {
++	GtkAllocation allocation = { 0 };
+ 	JanaGtkWorldMapPrivate *priv = WORLD_MAP_PRIVATE (self);
+ 	
++	gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
++
+ 	if (lon) {
+-		*lon = (((gdouble)x / (gdouble)GTK_WIDGET (self)->
+-			allocation.width) * (priv->theta_max -
++		*lon = (((gdouble)x / (gdouble) allocation.width) * (priv->theta_max -
+ 			priv->theta_min)) + priv->theta_min;
+ 	}
+ 
+ 	if (lat) {
+-		*lat = -((((gdouble)y / (gdouble)GTK_WIDGET (self)->
+-			allocation.height) * (priv->phi_max - priv->phi_min)) +
++		*lat = -((((gdouble)y / (gdouble) allocation.height) * (priv->phi_max - priv->phi_min)) +
+ 			priv->phi_min);
+ 	}
+ }
+@@ -936,18 +936,21 @@ void
+ jana_gtk_world_map_get_xy (JanaGtkWorldMap *self, gdouble lat, gdouble lon,
+ 			   gint *x, gint *y)
+ {
++	GtkAllocation allocation = { 0 };
+ 	JanaGtkWorldMapPrivate *priv = WORLD_MAP_PRIVATE (self);
+-	
++
++	gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
++
+ 	if (x) {
+ 		*x = ((lon / (priv->theta_max - priv->theta_min)) *
+-		       (gdouble)GTK_WIDGET (self)->allocation.width) +
+-			GTK_WIDGET (self)->allocation.width/2;
++		       (gdouble)allocation.width) +
++			allocation.width/2;
+ 	}
+ 
+ 	if (y) {
+ 		*y = (((-lat) / (priv->phi_max - priv->phi_min)) *
+-		       (gdouble)GTK_WIDGET (self)->allocation.height) +
+-			GTK_WIDGET (self)->allocation.height/2;
++		       (gdouble)allocation.height) +
++			allocation.height/2;
+ 	}
+ }
+ 
+@@ -1069,9 +1072,8 @@ jana_gtk_world_map_get_height (JanaGtkWorldMap *self)
+ static void
+ placeholder_realize_cb (GtkWidget *widget)
+ {
+-	GTK_WIDGET_SET_FLAGS (widget, GTK_NO_WINDOW);
+-	if (widget->window) g_object_unref (widget->window);
+-	widget->window = g_object_ref (gtk_widget_get_parent (widget)->window);
++	gtk_widget_set_has_window (widget, FALSE);
++	gtk_widget_set_window (widget, gtk_widget_get_window (gtk_widget_get_parent (widget)));
+ 	gtk_widget_queue_draw (gtk_widget_get_parent (widget));
+ }
+ 
+@@ -1085,7 +1087,7 @@ jana_gtk_world_map_glade_add_cb (GtkContainer *container,
+ 	g_signal_connect_after (widget, "realize",
+ 		G_CALLBACK (placeholder_realize_cb), NULL);
+ 
+-	if (GTK_WIDGET_REALIZED (widget))
++	if (gtk_widget_get_realized (widget))
+ 		placeholder_realize_cb (widget);
+ }
+ 

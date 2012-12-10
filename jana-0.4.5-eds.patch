@@ -1,0 +1,386 @@
+diff -up jana-0.4.5/configure.ac.eds jana-0.4.5/configure.ac
+--- jana-0.4.5/configure.ac.eds	2012-10-30 10:40:57.591842431 -0400
++++ jana-0.4.5/configure.ac	2012-10-30 10:41:03.678852814 -0400
+@@ -23,7 +23,6 @@ PKG_CHECK_MODULES(GOBJECT, gobject-2.0 >
+ PKG_CHECK_MODULES(GTHREAD, gthread-2.0)
+ PKG_CHECK_MODULES(GTK, gtk+-3.0 >= 2.99.1)
+ PKG_CHECK_MODULES(ECAL, libecal-1.2 >= 1.4.0)
+-PKG_CHECK_MODULES(EDATASERVERUI, libedataserverui-3.0)
+ 
+ PKG_CHECK_MODULES(GCONF, gconf-2.0)
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-component.h.eds jana-0.4.5/libjana-ecal/jana-ecal-component.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-component.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-component.h	2012-10-30 10:40:14.436803508 -0400
+@@ -22,7 +22,7 @@
+ #define JANA_ECAL_COMPONENT_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal-component.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-time.h>
+ #include <libjana/jana-component.h>
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-event.h.eds jana-0.4.5/libjana-ecal/jana-ecal-event.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-event.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-event.h	2012-10-30 10:40:14.437803508 -0400
+@@ -22,7 +22,7 @@
+ #define JANA_ECAL_EVENT_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal-component.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-component.h>
+ #include <libjana/jana-event.h>
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-note.h.eds jana-0.4.5/libjana-ecal/jana-ecal-note.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-note.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-note.h	2012-10-30 10:40:14.437803508 -0400
+@@ -22,7 +22,7 @@
+ #define JANA_ECAL_NOTE_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal-component.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-component.h>
+ #include <libjana/jana-note.h>
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-store.c.eds jana-0.4.5/libjana-ecal/jana-ecal-store.c
+--- jana-0.4.5/libjana-ecal/jana-ecal-store.c.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-store.c	2012-10-30 10:40:14.437803508 -0400
+@@ -33,7 +33,6 @@
+ #define HANDLE_LIBICAL_MEMORY 1
+ 
+ #include <libjana/jana-utils.h>
+-#include <libedataserverui/e-passwords.h>
+ #include "jana-ecal-component.h"
+ #include "jana-ecal-event.h"
+ #include "jana-ecal-note.h"
+@@ -41,8 +40,6 @@
+ #include "jana-ecal-store-view.h"
+ #include "jana-ecal-store.h"
+ 
+-static gint init_passwords = 0;
+-
+ static void store_interface_init (gpointer g_iface, gpointer iface_data);
+ 
+ static void		store_open			(JanaStore *self);
+@@ -58,10 +55,6 @@ static void	store_remove_component	(Jana
+ 
+ static void	store_cal_opened_cb	(ECal *ecal, gint arg1,
+ 					 JanaStore *self);
+-static gchar *	auth_func_cb 		(ECal       *ecal,
+-					 const gchar *prompt,
+-					 const gchar *key,
+-					 gpointer    user_data);
+ 
+ G_DEFINE_TYPE_WITH_CODE (JanaEcalStore,
+                         jana_ecal_store, 
+@@ -112,7 +105,6 @@ jana_ecal_store_set_property (GObject *o
+ 	switch (property_id) {
+ 	    case PROP_ECAL :
+ 		priv->ecal = E_CAL (g_value_dup_object (value));
+-		e_cal_set_auth_func (priv->ecal, auth_func_cb, NULL);
+ 		g_signal_connect (G_OBJECT (priv->ecal), "cal-opened",
+ 			G_CALLBACK (store_cal_opened_cb), object);
+ 		break;
+@@ -136,9 +128,6 @@ jana_ecal_store_dispose (GObject *object
+ 
+ 	if (G_OBJECT_CLASS (jana_ecal_store_parent_class)->dispose)
+ 		G_OBJECT_CLASS (jana_ecal_store_parent_class)->dispose (object);
+-
+-	if (g_atomic_int_dec_and_test (&init_passwords))
+-		e_passwords_shutdown ();
+ }
+ 
+ static void
+@@ -205,27 +194,6 @@ jana_ecal_store_init (JanaEcalStore *sel
+ 	/*JanaEcalStorePrivate *priv = STORE_PRIVATE (self);*/
+ }
+ 
+-#ifndef HAVE_ECAL_NEW_SYSTEM_MEMOS
+-/* Taken from eds libecal */
+-static ECal *
+-e_cal_new_system_memos (void)
+-{
+-	ECal *ecal;
+-	char *uri;
+-	char *filename;
+-
+-	filename = g_build_filename (g_get_home_dir (),
+-				     ".evolution/memos/local/system",
+-				     NULL);
+-	uri = g_filename_to_uri (filename, NULL, NULL);
+-	g_free (filename);
+-	ecal = e_cal_new_from_uri (uri, E_CAL_SOURCE_TYPE_JOURNAL);
+-	g_free (uri);
+-	
+-	return ecal;
+-}
+-#endif
+-
+ /**
+  * jana_ecal_store_new:
+  * @type: The type of store to create/open
+@@ -239,47 +207,47 @@ e_cal_new_system_memos (void)
+ JanaStore *
+ jana_ecal_store_new (JanaComponentType type)
+ {
+-	ECal *ecal;
+-	
++	ESourceRegistry *registry;
++	ESource *source;
++	JanaStore *store;
++	GError *error = NULL;
++
++	registry = e_source_registry_new_sync (NULL, &error);
++	if (!registry) {
++		g_warning ("%s: Cannot open ESourceRegistry: %s", G_STRFUNC, error ? error->message : "Unknown error");
++		g_clear_error (&error);
++
++		return NULL;
++	}
++
+ 	switch (type) {
+ 	    case JANA_COMPONENT_EVENT :
+-		ecal = e_cal_new_system_calendar ();
++		source = e_source_registry_ref_builtin_calendar (registry);
+ 		break;
+ 	    case JANA_COMPONENT_NOTE :
+-		ecal = e_cal_new_system_memos ();
++		source = e_source_registry_ref_builtin_memo_list (registry);
+ 		break;
+ 	    case JANA_COMPONENT_TASK :
+-		ecal = e_cal_new_system_tasks ();
++		source = e_source_registry_ref_builtin_task_list (registry);
+ 		break;
+ 	    default :
+ 		g_warning ("%s called with invalid type", G_STRFUNC);
++		g_object_unref (registry);
+ 		return NULL;
+ 	}
+-	
+-	g_atomic_int_inc (&init_passwords);
+-	
+-	if (g_atomic_int_get(&init_passwords) == 1) {
+-		e_passwords_init ();
++
++	if (!source) {
++		g_warning ("%s: Cannot find builtin source", G_STRFUNC);
++		g_object_unref (registry);
++		return NULL;
+ 	}
+-	return JANA_STORE (g_object_new (JANA_ECAL_TYPE_STORE,
+-		"ecal", ecal, "type", type, NULL));
+-}
+ 
+-static gchar *
+-auth_func_cb (ECal       *ecal,
+-	      const gchar *prompt,
+-	      const gchar *key,
+-	      gpointer    user_data)
+-{
+-	ESource *source;
+-	const gchar *auth_domain;
+-	const gchar *component_name;
++	store = jana_ecal_store_new_from_uid (e_source_get_uid (source), type);
+ 
+-	source = e_cal_get_source (ecal);
+-	auth_domain = e_source_get_property (source, "auth-domain");
+-	component_name = auth_domain ? auth_domain : "Calendar";
++	g_object_unref (source);
++	g_object_unref (registry);
+ 
+-	return e_passwords_get_password (component_name, key);
++	return store;
+ }
+ 
+ static gboolean
+@@ -299,22 +267,25 @@ store_cal_opened_cb (ECal *ecal, gint ar
+ }
+ 
+ /**
+- * jana_ecal_store_new_from_uri:
+- * @uri: The uri to the store
++ * jana_ecal_store_new_from_uid:
++ * @uid: The uid to the store
+  * @type: The type of store to create/open
+  *
+- * Opens or creates an evolution-data-server storage at the given uri for the 
++ * Opens or creates an evolution-data-server storage for the given uid and the 
+  * specified type of component.
+  *
+  * Returns: A #JanaEcalStore that wraps an evolution-data-server storage of 
+- * the specified component type at the given uri, cast as a #JanaStore.
++ * the specified component type for the given uid, cast as a #JanaStore.
+  */
+ JanaStore *
+-jana_ecal_store_new_from_uri (const gchar *uri, JanaComponentType type)
++jana_ecal_store_new_from_uid (const gchar *uid, JanaComponentType type)
+ {
++	ESourceRegistry *registry;
++	ESource *source;
+ 	ECal *ecal;
+ 	ECalSourceType etype;
+-	
++	GError *error = NULL;
++
+ 	switch (type) {
+ 	    case JANA_COMPONENT_EVENT :
+ 		etype = E_CAL_SOURCE_TYPE_EVENT;
+@@ -330,30 +301,48 @@ jana_ecal_store_new_from_uri (const gcha
+ 		return NULL;
+ 	}
+ 	
+-	if ((ecal = e_cal_new_from_uri (uri, etype))) {
+-		e_cal_set_auth_func (ecal, auth_func_cb, NULL);
++	registry = e_source_registry_new_sync (NULL, &error);
++	if (!registry) {
++		g_warning ("%s: Cannot open ESourceRegistry: %s", G_STRFUNC, error ? error->message : "Unknown error");
++		g_clear_error (&error);
++
++		return NULL;
++	}
++
++	source = e_source_registry_ref_source (registry, uid);
++	if (!source) {
++		g_warning ("%s: Failed to find source with uid '%s'", G_STRFUNC, uid);
++		g_object_unref (registry);
++		return NULL;
++	}
++
++	if ((ecal = e_cal_new (source, etype))) {
++		g_object_unref (source);
++		g_object_unref (registry);
+ 		return JANA_STORE (g_object_new (JANA_ECAL_TYPE_STORE,
+ 			"ecal", ecal, "type", type, NULL));
+ 	} else {
++		g_object_unref (source);
++		g_object_unref (registry);
+ 		g_warning ("Could not create ECal in %s", G_STRFUNC);
+ 		return NULL;
+ 	}
+ }
+ 
+ /**
+- * jana_ecal_store_get_uri
+- * @store: The store to get the uri of.
++ * jana_ecal_store_get_uid
++ * @store: The store to get the uid of.
+  *
+- * Returns: The uri of the calendar that this store represents.
++ * Returns: The uid of the calendar that this store represents.
+  */
+ const gchar *
+-jana_ecal_store_get_uri (JanaEcalStore *store)
++jana_ecal_store_get_uid (JanaEcalStore *store)
+ {
+ 	JanaEcalStorePrivate *priv = STORE_PRIVATE (store);
+ 
+ 	g_return_val_if_fail (JANA_ECAL_IS_STORE (store), NULL);
+ 
+-	return e_cal_get_uri (priv->ecal);
++	return e_source_get_uid (e_cal_get_source (priv->ecal));
+ }
+ 
+ static void
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-store.h.eds jana-0.4.5/libjana-ecal/jana-ecal-store.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-store.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-store.h	2012-10-30 10:40:14.437803508 -0400
+@@ -22,8 +22,7 @@
+ #define JANA_ECAL_STORE_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal.h>
+-#include <libecal/e-cal-view.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-store.h>
+ #include <libjana-ecal/jana-ecal-store.h>
+ 
+@@ -61,9 +60,9 @@ struct _JanaEcalStoreClass {
+ GType jana_ecal_store_get_type (void);
+ 
+ JanaStore *jana_ecal_store_new 		(JanaComponentType type);
+-JanaStore *jana_ecal_store_new_from_uri	(const gchar *uri,
++JanaStore *jana_ecal_store_new_from_uid	(const gchar *uid,
+ 					 JanaComponentType type);
+-const gchar *jana_ecal_store_get_uri	(JanaEcalStore *store);
++const gchar *jana_ecal_store_get_uid	(JanaEcalStore *store);
+ 
+ #endif /* JANA_ECAL_STORE_H */
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-store-view.c.eds jana-0.4.5/libjana-ecal/jana-ecal-store-view.c
+--- jana-0.4.5/libjana-ecal/jana-ecal-store-view.c.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-store-view.c	2012-10-30 10:40:14.437803508 -0400
+@@ -33,8 +33,7 @@
+ #define HANDLE_LIBICAL_MEMORY 1
+ 
+ #include <string.h>
+-#include <libecal/e-cal.h>
+-#include <libecal/e-cal-time-util.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-utils.h>
+ #include "jana-ecal-component.h"
+ #include "jana-ecal-event.h"
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-store-view.h.eds jana-0.4.5/libjana-ecal/jana-ecal-store-view.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-store-view.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-store-view.h	2012-10-30 10:40:14.437803508 -0400
+@@ -22,7 +22,7 @@
+ #define JANA_ECAL_STORE_VIEW_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal-view.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-store-view.h>
+ #include <libjana-ecal/jana-ecal-store.h>
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-task.h.eds jana-0.4.5/libjana-ecal/jana-ecal-task.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-task.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-task.h	2012-10-30 10:40:14.437803508 -0400
+@@ -22,7 +22,7 @@
+ #define JANA_ECAL_TASK_H
+ 
+ #include <glib-object.h>
+-#include <libecal/e-cal-component.h>
++#include <libecal/libecal.h>
+ #include <libjana/jana-component.h>
+ #include <libjana/jana-task.h>
+ 
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-time.h.eds jana-0.4.5/libjana-ecal/jana-ecal-time.h
+--- jana-0.4.5/libjana-ecal/jana-ecal-time.h.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-time.h	2012-10-30 10:40:14.437803508 -0400
+@@ -24,7 +24,7 @@
+ #include <glib-object.h>
+ #include <libical/ical.h>
+ #include <libjana/jana-time.h>
+-#include <libecal/e-cal-component.h>
++#include <libecal/libecal.h>
+ 
+ #define JANA_ECAL_TYPE_TIME		(jana_ecal_time_get_type ())
+ #define JANA_ECAL_TIME(obj)		(G_TYPE_CHECK_INSTANCE_CAST ((obj), \
+diff -up jana-0.4.5/libjana-ecal/jana-ecal-utils.c.eds jana-0.4.5/libjana-ecal/jana-ecal-utils.c
+--- jana-0.4.5/libjana-ecal/jana-ecal-utils.c.eds	2010-05-20 07:46:47.000000000 -0400
++++ jana-0.4.5/libjana-ecal/jana-ecal-utils.c	2012-10-30 10:40:14.437803508 -0400
+@@ -30,7 +30,7 @@
+ #include <string.h>
+ #include <libical/icaltime.h>
+ #include <libjana/jana-utils.h>
+-#include <libecal/e-cal-time-util.h>
++#include <libecal/libecal.h>
+ #include <libjana-ecal/jana-ecal-time.h>
+ #include <gconf/gconf-client.h>
+ #include "jana-ecal-utils.h"
+diff -up jana-0.4.5/libjana-ecal/Makefile.am.eds jana-0.4.5/libjana-ecal/Makefile.am
+--- jana-0.4.5/libjana-ecal/Makefile.am.eds	2012-10-30 10:41:20.264865845 -0400
++++ jana-0.4.5/libjana-ecal/Makefile.am	2012-10-30 10:41:29.059871269 -0400
+@@ -1,8 +1,8 @@
+ SUBDIRS = . doc
+ 
+ localedir = $(datadir)/locale
+-AM_CPPFLAGS = -DLOCALEDIR=\"$(localedir)\" -DPKGDATADIR=\"$(pkgdatadir)\" $(GOBJECT_CFLAGS) $(ECAL_CFLAGS) $(EDATASERVERUI_CFLAGS) $(GCONF_CFLAGS) -Wall
+-AM_LDFLAGS = $(GOBJECT_LIBS) $(ECAL_LIBS) $(GCONF_LIBS) $(EDATASERVERUI_LIBS)
++AM_CPPFLAGS = -DLOCALEDIR=\"$(localedir)\" -DPKGDATADIR=\"$(pkgdatadir)\" $(GOBJECT_CFLAGS) $(ECAL_CFLAGS) $(GCONF_CFLAGS) -Wall
++AM_LDFLAGS = $(GOBJECT_LIBS) $(ECAL_LIBS) $(GCONF_LIBS)
+ 
+ source_h = jana-ecal.h \
+ 	jana-ecal-component.h \
