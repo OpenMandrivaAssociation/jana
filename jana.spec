@@ -18,7 +18,7 @@ Summary:       An interface library for time-related PIM
 
 Group:         System/Libraries
 License:       LGPLv2
-URL:           http://git.gnome.org/cgit/jana/
+URL:           https://git.gnome.org/cgit/jana/
 Source0:       %{tarfile}
 Patch1:        jana.patch
 Patch2:        jana-0.4.5-eds.patch
